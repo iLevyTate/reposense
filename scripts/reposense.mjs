@@ -319,7 +319,7 @@ async function buildPayload(opts, log) {
   return {
     schema: 'reposense/1',
     generatedAt: new Date().toISOString(),
-    source: 'local-git',
+    source: git ? 'local-git' : 'local-fs',
     repo: {
       owner: slug.owner,
       name: slug.name,

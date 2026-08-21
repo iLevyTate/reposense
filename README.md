@@ -10,6 +10,10 @@ coloured by language, lit by how recently it changed.
 
 [**Open the visualizer →**](https://ilevytate.github.io/reposense/)
 
+<img src="public/cover.png" alt="RepoSense rendering its own repository: concentric glowing terraces stepping outward and upward, with file towers standing on each one" width="100%">
+
+<sub>RepoSense visualizing itself — the outer arm is the vendored copy of three.js.</sub>
+
 </div>
 
 ---

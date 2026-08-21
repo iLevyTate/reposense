@@ -195,7 +195,7 @@ export class Hud {
       return;
     }
     const bits = [formatBytes(file.size), file.lang];
-    if (file.commits) bits.push(`${formatCount(file.commits)} commits`);
+    if (file.commits) bits.push(plural(file.commits, 'commit'));
     if (file.lastTouched) bits.push(relTime(file.lastTouched));
     el.innerHTML = `<div class="tt-name">${esc(file.name)}</div><div class="tt-meta">${esc(bits.join(' · '))}</div>`;
     el.hidden = false;
@@ -270,6 +270,11 @@ function highlight(path, q) {
   const i = path.toLowerCase().indexOf(q);
   if (i === -1) return esc(path);
   return `${esc(path.slice(0, i))}<span class="hl">${esc(path.slice(i, i + q.length))}</span>${esc(path.slice(i + q.length))}`;
+}
+
+/** "1 commit" / "12 commits" — counts above 999 use the compact form. */
+function plural(n, word) {
+  return `${formatCount(n)} ${word}${n === 1 ? '' : 's'}`;
 }
 
 function pct(share) {

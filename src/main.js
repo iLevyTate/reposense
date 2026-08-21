@@ -336,7 +336,8 @@ async function present(payload) {
 
   app.hud.showLoading(false);
 
-  const src = payload.source === 'local-git' ? 'local git history' : 'the GitHub API';
+  const src = { 'local-git': 'local git history', 'local-fs': 'a local directory scan' }[payload.source]
+    || 'the GitHub API';
   app.hud.toast(`${app.model.stats.fileCount.toLocaleString()} files from ${src}`);
 
   updateShareUrl(payload);
