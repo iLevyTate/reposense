@@ -201,6 +201,27 @@ cd reposense
 npm start          # http://localhost:4173
 ```
 
+### Tests
+
+```bash
+npm test           # unit + CLI, no dependencies, ~2s
+npm ci             # once, for the browser test
+npx playwright install chromium
+npm run test:browser
+```
+
+`npm test` needs nothing installed — it runs on Node's built-in test runner and
+covers the data pipeline, the GitHub client (against a stubbed API), and the
+CLI end to end.
+
+The browser test is separate because it needs Chromium. It is the one that
+matters most: every defect found while building this was a runtime one — a
+renderer that drew nothing, a HUD stuck at `opacity: 0`, a handler wired to the
+wrong argument — and none of that is reachable without running the page. It
+boots the real static site and drives it, failing on any JavaScript error.
+
+Both run on every pull request.
+
 `.github/workflows/pages.yml` deploys `main` to GitHub Pages. To host your own
 copy: fork it, then **Settings → Pages → Source: GitHub Actions**. There is no
 build step — the workflow syntax-checks the sources, regenerates the bundled
