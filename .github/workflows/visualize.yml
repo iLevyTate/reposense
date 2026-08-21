@@ -1,0 +1,55 @@
+name: Visualize
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: visualize
+  cancel-in-progress: true
+
+jobs:
+  render:
+    # The commit this job makes lands on main and re-triggers the workflow. The
+    # second run renders identical files, finds nothing staged, commits nothing
+    # and stops — so this settles rather than looping.
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The render reads this repository's own git history.
+          fetch-depth: 0
+
+      - name: Render the dark variant
+        uses: ./
+        id: dark
+        with:
+          output: public/reposense-dark.svg
+          theme: dark
+
+      - name: Render the light variant
+        uses: ./
+        with:
+          output: public/reposense-light.svg
+          theme: light
+
+      # Committed here rather than by the action, because two files are being
+      # written and the action's own commit step only stages its own output.
+      - name: Commit both variants
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- public/reposense-dark.svg public/reposense-light.svg
+          if git diff --cached --quiet; then
+            echo "Visualization is already current." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git commit -m "chore: refresh the RepoSense visualization"
+          git push
+          echo "Refreshed from ${{ steps.dark.outputs.files }} files." >> "$GITHUB_STEP_SUMMARY"

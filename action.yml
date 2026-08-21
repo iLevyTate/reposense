@@ -1,0 +1,146 @@
+name: RepoSense
+description: Render a repository as a cinematic isometric SVG you can embed in your README.
+author: iLevyTate
+
+branding:
+  icon: layers
+  color: blue
+
+inputs:
+  path:
+    description: Directory to scan, relative to the workspace.
+    required: false
+    default: '.'
+  output:
+    description: Where to write the SVG, relative to the workspace.
+    required: false
+    default: reposense.svg
+  theme:
+    description: 'dark or light. Render twice to serve both — see the README.'
+    required: false
+    default: dark
+  width:
+    description: SVG width in pixels. Height follows the drawing's own ratio.
+    required: false
+    default: '1280'
+  commits:
+    description: >-
+      Limit history to the newest N commits. Leave empty to replay all of it.
+      History supplies churn and authorship; it does not affect the structure.
+    required: false
+    default: ''
+  history:
+    description: Set to 'false' to skip the git log pass entirely (much faster on huge repos).
+    required: false
+    default: 'true'
+  json:
+    description: Optionally also write the raw reposense.json to this path.
+    required: false
+    default: ''
+  commit:
+    description: >-
+      Set to 'true' to commit the rendered file back to the branch. Requires
+      `permissions: contents: write` and an `actions/checkout` step. Nothing is
+      committed when the render is unchanged.
+    required: false
+    default: 'false'
+  commit-message:
+    description: Commit message used when `commit` is true.
+    required: false
+    default: 'chore: update RepoSense visualization'
+
+outputs:
+  svg:
+    description: Path to the rendered SVG.
+    value: ${{ steps.render.outputs.svg }}
+  files:
+    description: Number of files found in the repository.
+    value: ${{ steps.render.outputs.files }}
+  changed:
+    description: 'true when the rendered SVG differs from what was already committed.'
+    value: ${{ steps.render.outputs.changed }}
+
+runs:
+  using: composite
+  steps:
+    - name: Render
+      id: render
+      shell: bash
+      env:
+        RS_PATH: ${{ inputs.path }}
+        RS_OUTPUT: ${{ inputs.output }}
+        RS_THEME: ${{ inputs.theme }}
+        RS_WIDTH: ${{ inputs.width }}
+        RS_COMMITS: ${{ inputs.commits }}
+        RS_HISTORY: ${{ inputs.history }}
+        RS_JSON: ${{ inputs.json }}
+      run: |
+        set -euo pipefail
+
+        # Every `test && cmd` below is written as a full if-block on purpose:
+        # under `set -e` a bare `[ ... ] && cmd` exits the whole script the
+        # moment the test is false, which would abort this action whenever the
+        # output did not already exist.
+
+        # The scanner has no dependencies, so there is nothing to install.
+        json_path="$RS_JSON"
+        if [ -z "$json_path" ]; then
+          # --svg implies no viewer; park the JSON somewhere disposable so the
+          # action leaves only the file the caller asked for.
+          json_path="$RUNNER_TEMP/reposense.json"
+        fi
+
+        args=("$RS_PATH" --svg "$RS_OUTPUT" --theme "$RS_THEME" --width "$RS_WIDTH" --out "$json_path")
+        if [ -n "$RS_COMMITS" ]; then
+          args+=(--commits "$RS_COMMITS")
+        fi
+        if [ "$RS_HISTORY" = "false" ]; then
+          args+=(--no-history)
+        fi
+
+        before=""
+        if [ -f "$RS_OUTPUT" ]; then
+          before=$(git hash-object "$RS_OUTPUT")
+        fi
+
+        node "$GITHUB_ACTION_PATH/scripts/reposense.mjs" "${args[@]}"
+
+        after=$(git hash-object "$RS_OUTPUT")
+        if [ "$before" = "$after" ]; then
+          changed=false
+        else
+          changed=true
+        fi
+
+        files=$(RS_JSON_PATH="$json_path" node --input-type=module -e "
+          import fs from 'node:fs';
+          const p = process.env.RS_JSON_PATH;
+          console.log(fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')).files.length : 0);
+        ")
+
+        {
+          echo "svg=$RS_OUTPUT"
+          echo "files=$files"
+          echo "changed=$changed"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "Rendered $RS_OUTPUT from $files files (changed: $changed)"
+
+    - name: Commit
+      if: ${{ inputs.commit == 'true' && steps.render.outputs.changed == 'true' }}
+      shell: bash
+      env:
+        RS_OUTPUT: ${{ inputs.output }}
+        RS_MESSAGE: ${{ inputs.commit-message }}
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -- "$RS_OUTPUT"
+        # Nothing staged means another step already committed it; not an error.
+        if git diff --cached --quiet; then
+          echo "No staged change; nothing to commit."
+          exit 0
+        fi
+        git commit -m "$RS_MESSAGE"
+        git push

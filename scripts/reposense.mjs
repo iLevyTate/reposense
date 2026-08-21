@@ -15,11 +15,13 @@
 
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { readdir, stat, writeFile, readFile } from 'node:fs/promises';
+import { mkdir, readdir, stat, writeFile, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, relative, resolve, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
+
+import { renderSvg } from '../src/svg.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(HERE, '..');
@@ -39,6 +41,9 @@ function parseArgs(argv) {
     open: true,
     port: 4173,
     quiet: false,
+    svg: null,
+    theme: 'dark',
+    width: 1280,
   };
   const rest = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -51,6 +56,14 @@ function parseArgs(argv) {
       case '--serve': opts.serve = true; break;
       case '--no-open': opts.open = false; break;
       case '-p': case '--port': opts.port = Number(argv[++i]) || 4173; break;
+      case '--svg':
+        // The value is optional: `--svg` alone writes reposense.svg.
+        opts.svg = argv[i + 1] && !argv[i + 1].startsWith('-') ? argv[++i] : 'reposense.svg';
+        opts.serve = false;
+        opts.open = false;
+        break;
+      case '--theme': opts.theme = argv[++i]; break;
+      case '--width': opts.width = Number(argv[++i]) || 1280; break;
       case '-q': case '--quiet': opts.quiet = true; break;
       case '-h': case '--help': opts.help = true; break;
       case '-v': case '--version': opts.version = true; break;
@@ -72,6 +85,9 @@ Usage
 
 Options
   -o, --out <file>      where to write the JSON        (default reposense.json)
+      --svg [file]      also render a static SVG        (default reposense.svg)
+      --theme <name>    svg theme: dark or light                 (default dark)
+      --width <px>      svg width; height follows the ratio     (default 1280)
   -c, --commits <n>     limit history to the newest n commits
       --no-history      skip git history entirely (much faster on huge repos)
       --json            write the JSON and exit; do not open the viewer
@@ -84,6 +100,7 @@ Examples
   reposense                        scan the current repo and open the viewer
   reposense ~/code/api --json      write ~/code/api's data to reposense.json
   reposense --no-history           structure only, skip the git log pass
+  reposense --svg docs/repo.svg    render an SVG to embed in a README
 `;
 
 /* ─────────────────────────────────────────────────────────────────── git ── */
@@ -468,6 +485,17 @@ async function main() {
     await writeFile(outPath, JSON.stringify(payload));
     if (opts.quiet) console.log(outPath);
     else log(`Wrote ${outPath}`);
+
+    if (opts.svg) {
+      if (opts.theme !== 'dark' && opts.theme !== 'light') {
+        throw new Error(`Unknown theme "${opts.theme}". Use dark or light.`);
+      }
+      const svgPath = resolve(opts.svg);
+      await mkdir(dirname(svgPath), { recursive: true });
+      await writeFile(svgPath, renderSvg(payload, { theme: opts.theme, width: opts.width }));
+      if (opts.quiet) console.log(svgPath);
+      else log(`Wrote ${svgPath}`);
+    }
 
     if (opts.serve) {
       const { url } = await serveViewer(payload, opts.port, log);

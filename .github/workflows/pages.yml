@@ -44,6 +44,13 @@ jobs:
         run: node scripts/reposense.mjs . --json --out public/demo.json
 
       - uses: actions/configure-pages@v5
+        with:
+          # Turn Pages on if it is not already. Without this the first deploy
+          # after a merge fails with "Get Pages site failed", and the fix is a
+          # setting nobody remembers to flip. The workflow already holds
+          # pages: write, and the repository is public, so this exposes nothing
+          # that was not already public.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
