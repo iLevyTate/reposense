@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit and CLI tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The CLI tests replay this repository's own git log.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check every source parses
+        run: |
+          for f in $(find src scripts test \( -name '*.js' -o -name '*.mjs' \)); do
+            node --check "$f"
+          done
+
+      - name: Unit and CLI tests
+        run: npm test
+
+      - name: The committed example is up to date
+        run: |
+          # public/demo.json is generated from this repo's git log and is what
+          # the landing page's demo route loads. It must stay loadable; the
+          # Pages deploy regenerates it, so drift is a warning, not a failure.
+          node scripts/reposense.mjs . --json --out /tmp/fresh.json
+          node -e "
+            const fresh = require('/tmp/fresh.json');
+            const shipped = require('./public/demo.json');
+            if (!shipped.files.length) { console.error('demo.json has no files'); process.exit(1); }
+            if (fresh.files.length !== shipped.files.length) {
+              console.log('::notice::public/demo.json lists ' + shipped.files.length +
+                ' files, a fresh scan finds ' + fresh.files.length + '. The deploy regenerates it.');
+            }
+          "
+
+  browser:
+    name: Browser smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test the real page
+        run: npm run test:browser
+
+      - name: Capture the failure state
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-failure
+          path: |
+            test/browser/last-state.png
+          if-no-files-found: ignore

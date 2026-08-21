@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RepoSense</title>
+<meta name="robots" content="noindex" />
+<style>
+  html, body { height: 100%; margin: 0; background: #04060d; color: #8697b0;
+    font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { height: 100%; display: grid; place-items: center; text-align: center; padding: 24px; }
+  a { color: #66e0ff; }
+</style>
+<script>
+  /**
+   * RepoSense routes entirely in the location hash, so any real path under the
+   * site is a typo or a stale link. Bounce to the app — and if the leftover
+   * path happens to look like owner/repo, load that repo instead of dropping
+   * the visitor on the start screen.
+   *
+   *   /reposense/pallets/flask  ->  /reposense/#/pallets/flask
+   */
+  (function () {
+    var parts = location.pathname.split('/').filter(Boolean);
+    // A github.io project site is served under /<repo>/; a user site is at /.
+    var siteRoot = location.hostname.endsWith('github.io') && parts.length ? '/' + parts[0] + '/' : '/';
+    var rest = location.pathname.slice(siteRoot.length).replace(/^\/+|\/+$/g, '');
+    var hash = /^[\w.-]+\/[\w.-]+$/.test(rest) ? '#/' + rest : '';
+    var target = siteRoot + hash;
+    // Never replace with where we already are: on a user site (user.github.io)
+    // the first segment is not a repository name, and the naive target can come
+    // back identical — which would spin in a redirect loop instead of showing
+    // this page's message.
+    if (target !== location.pathname + location.hash) location.replace(target);
+  })();
+</script>
+</head>
+<body>
+<main>
+  <p>Redirecting to <a href="./">RepoSense</a>…</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{
+  "name": "reposense",
+  "version": "1.0.0",
+  "description": "Turn any repository into a cinematic 3D structure you can fly through.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://ilevytate.github.io/reposense/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iLevyTate/reposense.git"
+  },
+  "bugs": {
+    "url": "https://github.com/iLevyTate/reposense/issues"
+  },
+  "keywords": [
+    "visualization",
+    "git",
+    "github",
+    "webgl",
+    "three.js",
+    "codebase",
+    "repository"
+  ],
+  "bin": {
+    "reposense": "scripts/reposense.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "scan": "node scripts/reposense.mjs",
+    "demo": "node scripts/reposense.mjs . --json --out public/demo.json",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node --test --test-concurrency=1 test/browser/*.test.mjs"
+  },
+  "files": [
+    "index.html",
+    "404.html",
+    "src/",
+    "styles/",
+    "vendor/",
+    "public/",
+    "scripts/"
+  ],
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}
