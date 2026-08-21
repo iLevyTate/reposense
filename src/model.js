@@ -88,8 +88,25 @@ export function buildModel(payload, opts = {}) {
     .map(([name, bytes]) => ({ name, bytes, color: colorOf(name), share: totalSize ? bytes / totalSize : 0 }))
     .sort((a, b) => b.bytes - a.bytes);
 
-  const times = files.map((f) => f.lastTouched || 0).filter(Boolean);
-  const added = files.map((f) => f.addedAt || 0).filter(Boolean);
+  // Reduced rather than spread into Math.min/Math.max: these are the one pair
+  // of arrays not bounded by the render budget, and a large locally-scanned
+  // monorepo would blow the argument limit and throw RangeError.
+  let firstAdded = 0;
+  let firstTouched = 0;
+  let lastTouched = 0;
+  let addedCount = 0;
+  for (const f of files) {
+    const t = f.lastTouched || 0;
+    if (t) {
+      if (t > lastTouched) lastTouched = t;
+      if (!firstTouched || t < firstTouched) firstTouched = t;
+    }
+    const a = f.addedAt || 0;
+    if (a) {
+      addedCount += 1;
+      if (!firstAdded || a < firstAdded) firstAdded = a;
+    }
+  }
 
   return {
     payload,
@@ -103,10 +120,10 @@ export function buildModel(payload, opts = {}) {
       maxSize,
       maxChurn,
       maxDepth: maxDepth(root),
-      hasHistory: added.length > 0,
+      hasHistory: addedCount > 0,
       hasChurn: maxChurn > 0,
-      firstTouched: added.length ? Math.min(...added) : (times.length ? Math.min(...times) : 0),
-      lastTouched: times.length ? Math.max(...times) : 0,
+      firstTouched: firstAdded || firstTouched,
+      lastTouched,
     },
     languages,
   };

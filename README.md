@@ -101,7 +101,8 @@ always produces the same structure.
 ### Three views
 
 - **Arcology** — the structure itself. Hover any tower to inspect it, click to
-  open it on GitHub, search to isolate a subtree.
+  keep it selected, shift-click to open it on GitHub, search to isolate a
+  subtree.
 - **Chronology** — scrub the repository's history. With creation dates
   available, towers rise as history reaches them; otherwise the timeline drives
   churn heat only, and the panel says so rather than pretending.

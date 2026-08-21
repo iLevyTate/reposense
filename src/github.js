@@ -207,14 +207,19 @@ function normalizeActivity(weeks) {
 async function applyDeepScan(payload, slug, limit, { signal, onProgress }) {
   onProgress({ phase: 'Listing commits', progress: 0.45 });
 
+  // Page size must stay constant across requests: GitHub pages by offset, so
+  // shrinking per_page on the last page re-requests commits already collected
+  // and skips the tail. Over-fetch a whole page and trim instead.
+  const PAGE = 100;
   const shas = [];
-  for (let page = 1; shas.length < limit && page <= 4; page += 1) {
-    const perPage = Math.min(100, limit - shas.length);
-    const list = await request(`/repos/${slug}/commits?per_page=${perPage}&page=${page}`, { signal });
+  const maxPages = Math.ceil(limit / PAGE);
+  for (let page = 1; shas.length < limit && page <= maxPages; page += 1) {
+    const list = await request(`/repos/${slug}/commits?per_page=${PAGE}&page=${page}`, { signal });
     if (!Array.isArray(list) || !list.length) break;
     for (const c of list) if (c.sha) shas.push(c.sha);
-    if (list.length < perPage) break;
+    if (list.length < PAGE) break;
   }
+  if (shas.length > limit) shas.length = limit;
   if (!shas.length) return;
 
   const byPath = new Map(payload.files.map((f) => [f.path, f]));

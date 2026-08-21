@@ -6,6 +6,7 @@
  */
 
 import { formatBytes, formatCount } from '../model.js';
+import { githubUrlFor } from '../links.js';
 import { colorOf } from '../palette.js';
 
 const $ = (id) => document.getElementById(id);
@@ -35,7 +36,6 @@ export class Hud {
       loadingDetail: $('loading-detail'),
       loadingFill: $('loading-fill'),
     };
-    this.onOpenFile = () => {};
     this.onFocusFile = () => {};
   }
 
@@ -126,7 +126,7 @@ export class Hud {
   showFile(file, model) {
     if (!file) {
       this.el.inspector.innerHTML =
-        '<p class="inspector-empty">Hover a tower to inspect it. Click to open it on GitHub.</p>';
+        '<p class="inspector-empty">Hover a tower to inspect it. Click to keep it selected; shift-click opens it on GitHub.</p>';
       return;
     }
     const color = colorOf(file.lang);
@@ -143,11 +143,7 @@ export class Hud {
     if (file.addedAt) rows.push(['Created', relTime(file.addedAt)]);
     if (file.bundle) rows.push(['Files folded', formatCount(file.bundle)]);
 
-    const r = this.repo || {};
-    const branch = r.branch || 'HEAD';
-    const url = file.bundle
-      ? `${r.url}/tree/${branch}/${encodeURI(dir.replace(/\/$/, ''))}`
-      : `${r.url}/blob/${branch}/${encodeURI(file.path)}`;
+    const url = githubUrlFor(this.repo, file);
 
     this.el.inspector.innerHTML = `
       <p class="insp-path"><span class="dir">${esc(dir)}</span><span class="base">${esc(base)}</span></p>
@@ -157,7 +153,7 @@ export class Hud {
         .join('')}</dl>
       <div class="insp-actions">
         <button type="button" data-act="focus">Fly to</button>
-        ${r.url ? `<a href="${esc(url)}" target="_blank" rel="noopener">Open on GitHub</a>` : ''}
+        ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">Open on GitHub</a>` : ''}
       </div>`;
 
     const focusBtn = this.el.inspector.querySelector('[data-act="focus"]');

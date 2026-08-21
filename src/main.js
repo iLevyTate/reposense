@@ -13,10 +13,12 @@ import { Stage } from './scene/stage.js';
 import { Arcology } from './scene/arcology.js';
 import { Constellation } from './scene/constellation.js';
 import { Cinema, Recorder, TOUR_DURATION } from './scene/cinema.js';
+import { githubUrlFor } from './links.js';
 import { Hud } from './ui/hud.js';
 
 const $ = (id) => document.getElementById(id);
 const REVEAL_SECONDS = 2.6;
+const TIMELINE_SWEEP_SECONDS = 24;
 
 const app = {
   stage: null,
@@ -32,6 +34,7 @@ const app = {
   hovered: null,
   hits: [],
   timePlaying: false,
+  timePlayFrom: null,
   timeT: 1,
   recorder: null,
   abort: null,
@@ -115,14 +118,20 @@ function initLaunch() {
   }
   dz.addEventListener('drop', (e) => {
     e.preventDefault();
+    // The document-level handler below would otherwise load the same file again.
+    e.stopPropagation();
     const file = e.dataTransfer?.files?.[0];
     if (file) loadFile(file).catch((err) => showError(err.message));
   });
+
   // Accept a drop anywhere on the launch screen, not just the small target.
+  // Both handlers must preventDefault unconditionally: the browser's default
+  // action for a dropped file is to navigate to it, which would throw away the
+  // whole session if you missed the dropzone or dropped onto the viewer.
   document.addEventListener('dragover', (e) => e.preventDefault());
   document.addEventListener('drop', (e) => {
+    e.preventDefault();
     if (!$('launch').hidden && e.dataTransfer?.files?.[0]) {
-      e.preventDefault();
       loadFile(e.dataTransfer.files[0]).catch((err) => showError(err.message));
     }
   });
@@ -181,8 +190,19 @@ function drawLaunchBackdrop() {
 
   addEventListener('resize', resize);
   resize();
-  raf = requestAnimationFrame(frame);
-  app.stopLaunchBackdrop = () => cancelAnimationFrame(raf);
+
+  // Start/stop rather than a one-way cancel: returning to the launch screen
+  // used to leave a frozen starfield that went blank on the next resize.
+  app.stopLaunchBackdrop = () => {
+    cancelAnimationFrame(raf);
+    raf = 0;
+  };
+  app.startLaunchBackdrop = () => {
+    if (raf) return;
+    resize();
+    raf = requestAnimationFrame(frame);
+  };
+  app.startLaunchBackdrop();
 }
 
 /* ══════════════════════════════════════════════════════════════ loading ══ */
@@ -295,7 +315,10 @@ async function present(payload) {
   if (!app.stage) {
     app.stage = new Stage($('stage'), $('labels'));
     app.cinema = new Cinema(app.stage, {
-      onShot: (shot) => app.hud.showCaption(shot),
+      onShot: (shot) => {
+        app.hud.showCaption(shot);
+        if (shot?.mode) applyTourMode(shot.mode);
+      },
       onProgress: (p) => onTourProgress(p),
       onEnd: () => endTour(),
     });
@@ -368,6 +391,7 @@ function teardownScene() {
 function showLaunch() {
   $('viewer').hidden = true;
   $('launch').hidden = false;
+  app.startLaunchBackdrop?.();
   app.hud.showLoading(false);
   document.title = 'RepoSense — Visualize Your Repo Cinematically';
   refreshRateHint();
@@ -406,8 +430,14 @@ function wireViewer() {
     const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
     downAt = null;
     if (moved > 5) return;
-    if (app.hovered) selectFile(app.hovered, e.shiftKey);
-    else selectFile(null);
+    if (!app.hovered) {
+      selectFile(null);
+      return;
+    }
+    selectFile(app.hovered);
+    // A modifier turns the click into "open on GitHub". Plain click selects,
+    // because clicking is also how you pick a tower to read in the inspector.
+    if (e.shiftKey || e.metaKey || e.ctrlKey) openOnGitHub(app.hovered);
   });
 
   // Picking runs at most once per frame, from the render loop.
@@ -465,6 +495,7 @@ function wireViewer() {
   $('time-play').addEventListener('click', () => toggleTimePlay());
   $('time-range').addEventListener('input', (e) => {
     app.timePlaying = false;
+    app.timePlayFrom = null;
     syncPlayIcon();
     setTime(Number(e.target.value) / 1000);
   });
@@ -553,6 +584,32 @@ function applySearch(query) {
 
 /* ═════════════════════════════════════════════════════════════════ modes ══ */
 
+function modeAvailable(mode) {
+  const btn = document.querySelector(`[data-mode="${mode}"]`);
+  return !!btn && !btn.disabled;
+}
+
+/**
+ * Switches mode for a tour shot.
+ *
+ * Falls back to the Arcology when a shot's mode has no data behind it, and
+ * stays silent about it — the HUD is hidden during a tour, so the toast
+ * setMode() would raise has nowhere to go.
+ */
+function applyTourMode(mode) {
+  const target = modeAvailable(mode) ? mode : 'arcology';
+  if (app.mode !== target) setMode(target);
+}
+
+function openOnGitHub(file) {
+  const url = githubUrlFor(app.model?.payload?.repo, file);
+  if (!url) {
+    app.hud.toast('This dataset has no GitHub origin to open.', { error: true });
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
+}
+
 function setMode(mode) {
   const btn = document.querySelector(`[data-mode="${mode}"]`);
   if (btn?.disabled) {
@@ -578,6 +635,7 @@ function setMode(mode) {
     setTime(app.timeT);
   } else {
     app.timePlaying = false;
+    app.timePlayFrom = null;
     syncPlayIcon();
     app.arcology?.resetTime();
     app.hud.showTime(0, '');
@@ -610,6 +668,7 @@ function setTime(t01) {
 function toggleTimePlay() {
   app.timePlaying = !app.timePlaying;
   if (app.timePlaying && app.timeT >= 0.999) app.timeT = 0;
+  app.timePlayFrom = null;
   syncPlayIcon();
 }
 
@@ -624,6 +683,7 @@ function syncPlayIcon() {
 
 function startTour() {
   if (!app.arcology) return;
+  app.modeBeforeTour = app.mode;
   app.hud.showTooltip(null);
   document.getElementById('viewer').classList.add('is-cinema');
   $('tour-bar').hidden = false;
@@ -641,7 +701,9 @@ function endTour() {
   $('tour-button').classList.remove('is-active');
   app.hud.showCaption(null);
   $('tour-fill').style.width = '0%';
-  setMode(app.mode === 'chronology' ? 'chronology' : app.mode);
+  // The tour drives the mode from its shot list; put the viewer back where the
+  // viewer left it.
+  setMode(app.modeBeforeTour || 'arcology');
 }
 
 function onTourProgress(p) {
@@ -743,20 +805,27 @@ function tick(dt, time) {
     }
   }
 
-  app.cinema.update(dt);
+  app.cinema.update(dt, time);
 
   // The tour drives the chronology scrub itself so the shot lands on "today".
   if (app.cinema.playing && app.mode === 'chronology') {
     const shotT = Math.min(1, Math.max(0, (app.cinema.shotProgress() - 0.55) / 0.28));
     setTime(shotT);
   } else if (app.timePlaying) {
-    app.timeT += dt / 24; // a full history sweep takes ~24 seconds
-    if (app.timeT >= 1) {
-      app.timeT = 1;
-      app.timePlaying = false;
-      syncPlayIcon();
+    // Wall clock, for the same reason as the tour and the reveal: a sweep
+    // advertised as 24 seconds must not stretch with the frame rate.
+    if (app.timePlayFrom === null) {
+      app.timePlayFrom = { at: time, from: app.timeT };
     }
-    setTime(app.timeT);
+    const t = app.timePlayFrom.from + (time - app.timePlayFrom.at) / TIMELINE_SWEEP_SECONDS;
+    if (t >= 1) {
+      app.timePlaying = false;
+      app.timePlayFrom = null;
+      syncPlayIcon();
+      setTime(1);
+    } else {
+      setTime(t);
+    }
   }
 
   app.arcology.update(dt, time, app.stage.camera);

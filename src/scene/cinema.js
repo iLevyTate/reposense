@@ -94,6 +94,7 @@ export class Cinema {
     this.onProgress = onProgress || (() => {});
     this.onEnd = onEnd || (() => {});
     this.playing = false;
+    this.startedAt = null;
     this.radius = 200;
     this.height = 40;
     this.center = new THREE.Vector3();
@@ -176,10 +177,22 @@ export class Cinema {
   }
 
   /** Smoothly move the camera; cancels any tour in progress. */
+  /**
+   * Both the tour and fly-to run on wall-clock elapsed time rather than
+   * accumulated frame deltas.
+   *
+   * `dt` is capped at 50ms so a backgrounded tab cannot make an animation jump.
+   * Integrating that cap makes every animation advance per *frame* instead of
+   * per second, so on a machine that cannot hold 60fps a 48-second tour quietly
+   * stretches to several minutes — and the recorder promises 48 seconds.
+   */
   flyTo(pos, target, duration = 1.2) {
-    this.playing = false;
+    // stop() rather than clearing `playing`: the tour hides the entire HUD via
+    // a class on #viewer, and only the stop path takes it off again. Flying
+    // somewhere mid-tour used to leave the UI invisible and unclickable.
+    if (this.playing) this.stop();
     this._fly = {
-      t: 0,
+      startedAt: null,
       duration,
       fromPos: this.stage.camera.position.clone(),
       fromTarget: this.stage.controls.target.clone(),
@@ -206,6 +219,7 @@ export class Cinema {
     this.cancelFly();
     this.playing = true;
     this.time = 0;
+    this.startedAt = null; // stamped on the first update, from the wall clock
     this.shotIndex = -1;
     this.stage.controls.enabled = false;
   }
@@ -230,14 +244,16 @@ export class Cinema {
     return this.playing ? this.time / TOUR_DURATION : 0;
   }
 
-  update(dt) {
+  /** @param {number} time seconds of wall-clock time since the stage started */
+  update(dt, time) {
     if (this._fly) {
       const f = this._fly;
-      f.t += dt;
-      const t = easeInOut(Math.min(1, f.t / f.duration));
+      if (f.startedAt === null) f.startedAt = time;
+      const elapsed = time - f.startedAt;
+      const t = easeInOut(Math.min(1, elapsed / f.duration));
       this.stage.camera.position.lerpVectors(f.fromPos, f.toPos, t);
       this.stage.controls.target.lerpVectors(f.fromTarget, f.toTarget, t);
-      if (f.t >= f.duration) {
+      if (elapsed >= f.duration) {
         this._fly = null;
         this.stage.controls.enabled = true;
       }
@@ -246,7 +262,8 @@ export class Cinema {
 
     if (!this.playing) return;
 
-    this.time += dt;
+    if (this.startedAt === null) this.startedAt = time;
+    this.time = time - this.startedAt;
     if (this.time >= TOUR_DURATION) {
       this.stop();
       return;
