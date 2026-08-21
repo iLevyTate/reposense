@@ -618,15 +618,31 @@ export class Arcology {
     // Visibility is judged per label against the camera, scaled by how big this
     // particular structure is — a fixed distance would show everything on a
     // small repo and nothing on a large one.
-    const unit = this.layout.fitRadius || 100;
+    // Label thresholds are distances, and a narrow viewport parks the camera
+    // further back (see Cinema#aspectPullback) — so the same rule has to be
+    // scaled by the same factor, or a phone shows no labels at all.
+    const halfV = (camera.fov * Math.PI) / 360;
+    const halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+    const halfRef = Math.atan(Math.tan(halfV) * (16 / 9));
+    const pullback = Math.min(2.2, Math.max(0.86, Math.pow(Math.sin(halfRef) / Math.sin(halfH), 0.65)));
+    const unit = (this.layout.fitRadius || 100) * pullback;
+    // Narrow viewports also get fewer tiers: the same 14 pills that read as
+    // annotation on a desktop bury a phone screen.
+    const narrow = innerWidth < 720;
+    const budget = 4;
     for (const obj of this.labels) {
       obj.position.y = obj.userData.ring * this.lift + 3.2;
+      const d = obj.userData.node.depth;
+      if (narrow && d > 1) {
+        // On a phone only the top-level districts are worth naming.
+        obj.visible = false;
+        continue;
+      }
       obj.getWorldPosition(_labelPos);
       const dist = _labelPos.distanceTo(camera.position);
-      const d = obj.userData.node.depth;
       // Shallow folders stay legible from further out; deep ones only appear
       // once you fly in, which keeps the wide shots clean.
-      const threshold = unit * (2.2 + (4 - Math.min(d, 4)) * 0.75);
+      const threshold = unit * (2.2 + (budget - Math.min(d, budget)) * 0.75);
       obj.visible = dist < threshold;
     }
   }

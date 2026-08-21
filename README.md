@@ -111,6 +111,15 @@ always produces the same structure.
 Press **T** for a scripted camera tour through all three, and **R** to record it
 to a WebM file.
 
+### Displays
+
+Framing adapts to the viewport's aspect ratio. three.js fixes the *vertical*
+field of view, and a radial structure is far wider than it is tall, so without a
+correction a portrait phone crops the outer rings straight off the sides while
+an ultrawide leaves the structure stranded in the middle. RepoSense corrects for
+both — pulling back on narrow screens, pushing in slightly on wide ones — and
+re-frames when a phone is rotated. Verified from 390×844 up to 5120×1440.
+
 ### Keyboard
 
 | Key | |

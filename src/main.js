@@ -27,7 +27,7 @@ const app = {
   model: null,
   layout: null,
   mode: 'arcology',
-  reveal: 0,
+  revealStart: null,
   selected: null,
   hovered: null,
   hits: [],
@@ -330,7 +330,7 @@ async function present(payload) {
   document.querySelector('[data-mode="constellation"]').disabled = app.constellation.empty;
 
   setMode('arcology');
-  app.reveal = 0;
+  app.revealStart = app.stage.clock.elapsedTime;
   app.selected = null;
   $('search-input').value = '';
 
@@ -482,6 +482,22 @@ function wireViewer() {
   };
 
   addEventListener('keydown', onKey);
+
+  // Rotating a phone flips the aspect ratio, and the framing correction that
+  // keeps a wide structure on screen depends on it. Re-frame on an actual
+  // orientation change only — never on an ordinary desktop window resize,
+  // which would yank the camera out from under the viewer.
+  let wasPortrait = innerWidth < innerHeight;
+  let reframeTimer;
+  addEventListener('resize', () => {
+    const isPortrait = innerWidth < innerHeight;
+    if (isPortrait === wasPortrait) return;
+    wasPortrait = isPortrait;
+    clearTimeout(reframeTimer);
+    reframeTimer = setTimeout(() => {
+      if (!app.cinema.playing) app.cinema.defaultView();
+    }, 220);
+  });
 }
 
 function onKey(e) {
@@ -709,14 +725,21 @@ function tick(dt, time) {
   if (!app.arcology) return;
 
   // Reveal: the structure lifts out of a flat disc and fades in ring by ring.
-  if (app.reveal < 1) {
-    app.reveal = Math.min(1, app.reveal + dt / REVEAL_SECONDS);
-    const e = 1 - Math.pow(1 - app.reveal, 4);
+  //
+  // Driven by wall-clock elapsed time, not by accumulating `dt`. `dt` is capped
+  // at 50ms so a backgrounded tab cannot jump the animation, but that cap also
+  // means a slow frame rate advances the reveal per *frame* rather than per
+  // second — on a 5120x1440 display at a few frames per second the structure
+  // stayed invisible for close to a minute.
+  if (app.revealStart !== null) {
+    const p = Math.min(1, (time - app.revealStart) / REVEAL_SECONDS);
+    const e = 1 - Math.pow(1 - p, 4);
     app.arcology.setLift(LIFT * e);
     app.arcology.setFade(1 - e);
-    if (app.reveal >= 1) {
+    if (p >= 1) {
       app.arcology.setLift(LIFT);
       app.arcology.setFade(0);
+      app.revealStart = null;
     }
   }
 

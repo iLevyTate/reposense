@@ -124,8 +124,33 @@ export class Cinema {
     }
   }
 
+  /**
+   * How much further back this viewport needs to sit than the 16:9 the shots
+   * were framed against.
+   *
+   * three.js fixes the *vertical* field of view, so a narrow or portrait
+   * viewport sees less horizontally at the same distance — and a radial
+   * structure is far wider than it is tall. Without this correction a phone in
+   * portrait crops the outer rings straight off the sides.
+   */
+  #aspectPullback() {
+    const cam = this.stage.camera;
+    const halfV = (cam.fov * Math.PI) / 360;
+    const halfH = Math.atan(Math.tan(halfV) * cam.aspect);
+    const halfRef = Math.atan(Math.tan(halfV) * (16 / 9));
+    const exact = Math.sin(halfRef) / Math.sin(halfH);
+    // Deliberately under-correct. Fitting the full width of a wide, flat
+    // structure into a tall screen technically works, but leaves it stranded in
+    // the middle of a mostly empty frame. Softening the exponent trades a
+    // little crop at the extremes for a structure that still fills the shot.
+    // The lower bound lets a very wide display push *in* a little: there the
+    // vertical field is the constraint and horizontal room goes spare, so a
+    // 16:9 framing leaves an ultrawide looking emptier than it needs to.
+    return Math.min(2.2, Math.max(0.86, Math.pow(exact, 0.65)));
+  }
+
   #resolve(spec) {
-    const r = spec.r * this.radius;
+    const r = spec.r * this.radius * this.#aspectPullback();
     const sinPhi = Math.sin(spec.phi);
     // `ty` is a fraction of the structure's height, measured about the centre,
     // so 0.5 looks level at the middle of the mass.
