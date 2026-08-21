@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>RepoSense — Visualize Your Repo Cinematically</title>
+<meta name="description" content="Turn any GitHub repository into a cinematic 3D structure you can fly through. No install, no backend — paste a repo name and watch it build itself." />
+<meta name="color-scheme" content="dark" />
+
+<meta property="og:title" content="RepoSense — Visualize Your Repo Cinematically" />
+<meta property="og:description" content="Turn any GitHub repository into a cinematic 3D structure you can fly through." />
+<meta property="og:type" content="website" />
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='5' fill='%2366e0ff'/><circle cx='16' cy='16' r='11' fill='none' stroke='%238f6bff' stroke-width='2'/><circle cx='16' cy='16' r='15' fill='none' stroke='%23ff5fa8' stroke-width='1.5' opacity='.6'/></svg>" />
+<link rel="stylesheet" href="./styles/app.css" />
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/build/three.module.js",
+    "three/addons/": "./vendor/three/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- ───────────────────────────── launch screen ───────────────────────────── -->
+<section id="launch" class="launch">
+  <div class="launch-bg" aria-hidden="true"><canvas id="launch-canvas"></canvas></div>
+
+  <div class="launch-inner">
+    <header class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="core"></span>
+      </div>
+      <h1>RepoSense</h1>
+      <p class="tagline">Visualize your repo cinematically</p>
+    </header>
+
+    <p class="pitch">
+      Every file becomes a tower. Every folder becomes a terrace. The whole repository
+      assembles itself into a structure you can fly through — sized by bytes, coloured by
+      language, lit by how recently it changed.
+    </p>
+
+    <form id="repo-form" class="repo-form" autocomplete="off">
+      <div class="input-wrap">
+        <svg class="input-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38l-.01-1.49c-2.01.37-2.53-.49-2.7-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48l-.01 2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"/></svg>
+        <input
+          id="repo-input"
+          name="repo"
+          type="text"
+          placeholder="owner/repository"
+          spellcheck="false"
+          aria-label="GitHub repository, as owner/repository"
+          required />
+        <button type="submit" class="go" id="go-button">
+          <span>Visualize</span>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M6 3l5 5-5 5V3z"/></svg>
+        </button>
+      </div>
+
+      <div class="examples" id="examples">
+        <span class="examples-label">Try</span>
+        <button type="button" data-repo="sindresorhus/got">sindresorhus/got</button>
+        <button type="button" data-repo="pallets/flask">pallets/flask</button>
+        <button type="button" data-repo="charmbracelet/bubbletea">charmbracelet/bubbletea</button>
+        <button type="button" data-repo="ohmyzsh/ohmyzsh">ohmyzsh/ohmyzsh</button>
+      </div>
+
+      <details class="options" id="options">
+        <summary>
+          <span>Options</span>
+          <span class="rate-hint" id="rate-hint"></span>
+        </summary>
+        <div class="options-body">
+          <label class="opt">
+            <input type="checkbox" id="deep-scan" />
+            <span>
+              <strong>Deep history scan</strong>
+              <em>Opens recent commits to recover per-file churn and a real growth timeline. Costs one API request per commit.</em>
+            </span>
+          </label>
+          <label class="opt opt-range" id="deep-count-row" hidden>
+            <span><strong>Commits to replay</strong></span>
+            <input type="range" id="deep-count" min="30" max="300" step="10" value="120" />
+            <output id="deep-count-out">120</output>
+          </label>
+          <label class="opt opt-token">
+            <span>
+              <strong>GitHub token <em class="muted">(optional)</em></strong>
+              <em>Raises the rate limit from 60 to 5,000 requests/hour and unlocks private repositories. Stored only in this browser's local storage and sent only to api.github.com.</em>
+            </span>
+            <input type="password" id="token-input" placeholder="ghp_… / github_pat_…" spellcheck="false" autocomplete="off" />
+          </label>
+        </div>
+      </details>
+    </form>
+
+    <div class="local-path">
+      <div class="local-or"><span>or</span></div>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Load a reposense.json file">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3m0 0L8 7m4-4 4 4M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/></svg>
+        <p><strong>Drop a <code>reposense.json</code></strong></p>
+        <p class="muted">Private repos, full git history, no API limits — generate one locally:</p>
+        <code class="cmd">npx github:iLevyTate/reposense</code>
+        <input type="file" id="file-input" accept=".json,application/json" hidden />
+      </div>
+    </div>
+
+    <p class="error" id="launch-error" role="alert" hidden></p>
+
+    <footer class="launch-foot">
+      <a href="https://github.com/iLevyTate/reposense" target="_blank" rel="noopener">Source</a>
+      <span>·</span>
+      <span>Runs entirely in your browser</span>
+      <span>·</span>
+      <button type="button" id="demo-link" class="linkish">See RepoSense visualizing itself</button>
+    </footer>
+  </div>
+</section>
+
+<!-- ─────────────────────────────── the viewer ────────────────────────────── -->
+<main id="viewer" class="viewer" hidden>
+  <div id="stage" class="stage"></div>
+  <div id="labels" class="labels" aria-hidden="true"></div>
+
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="scanline" aria-hidden="true"></div>
+
+  <!-- top bar -->
+  <header class="topbar" id="topbar">
+    <button class="icon-btn back" id="back-button" title="Back to start" aria-label="Back to start">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M10 13L5 8l5-5v10z"/></svg>
+    </button>
+    <div class="repo-id">
+      <a id="repo-link" class="repo-name" href="#" target="_blank" rel="noopener"></a>
+      <p class="repo-desc" id="repo-desc"></p>
+    </div>
+    <dl class="repo-stats" id="repo-stats"></dl>
+  </header>
+
+  <!-- left: composition -->
+  <aside class="panel panel-left" id="panel-left">
+    <button class="panel-toggle" id="left-toggle" aria-expanded="true" aria-controls="left-body">
+      <span>Composition</span>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M3 6l5 5 5-5H3z"/></svg>
+    </button>
+    <div class="panel-body" id="left-body">
+      <div class="spectrum" id="spectrum" role="img" aria-label="Language composition"></div>
+      <ul class="legend" id="legend"></ul>
+      <dl class="metrics" id="metrics"></dl>
+      <p class="note" id="model-note" hidden></p>
+    </div>
+  </aside>
+
+  <!-- right: search + inspector -->
+  <aside class="panel panel-right" id="panel-right">
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10Zm3.6.6L14 16"/></svg>
+      <input type="search" id="search-input" placeholder="Find a file or folder…" aria-label="Search files" spellcheck="false" />
+      <span class="search-count" id="search-count"></span>
+    </div>
+    <div class="inspector" id="inspector">
+      <p class="inspector-empty">Hover a tower to inspect it. Click to open it on GitHub.</p>
+    </div>
+    <ul class="hitlist" id="hitlist"></ul>
+  </aside>
+
+  <!-- bottom: modes + timeline -->
+  <div class="dock" id="dock">
+    <div class="modes" role="tablist" aria-label="View mode">
+      <button role="tab" class="mode is-active" data-mode="arcology" aria-selected="true">
+        <span class="mode-key">1</span> Arcology
+      </button>
+      <button role="tab" class="mode" data-mode="chronology" aria-selected="false">
+        <span class="mode-key">2</span> Chronology
+      </button>
+      <button role="tab" class="mode" data-mode="constellation" aria-selected="false">
+        <span class="mode-key">3</span> Constellation
+      </button>
+    </div>
+
+    <div class="timeline" id="timeline" hidden>
+      <button class="icon-btn" id="time-play" aria-label="Play timeline">
+        <svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 3l8 5-8 5V3z"/></svg>
+        <svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" hidden><path fill="currentColor" d="M4 3h3v10H4zM9 3h3v10H9z"/></svg>
+      </button>
+      <input type="range" id="time-range" min="0" max="1000" value="1000" aria-label="History position" />
+      <div class="time-read">
+        <strong id="time-date">—</strong>
+        <span id="time-detail"></span>
+      </div>
+    </div>
+
+    <div class="tools">
+      <button class="tool" id="tour-button" title="Play the cinematic tour (T)"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 3l8 5-8 5V3z"/></svg><span>Tour</span></button>
+      <button class="tool" id="record-button" title="Record a WebM video (R)"><span class="rec-dot"></span><span>Record</span></button>
+      <button class="tool" id="shot-button" title="Save a PNG (P)"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M2 5.5h3L6 4h4l1 1.5h3v7H2z"/><circle cx="8" cy="9" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>Snapshot</span></button>
+      <button class="tool" id="export-button" title="Download the underlying data as JSON"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 2v8m0 0L5 7m3 3 3-3M3 12v2h10v-2"/></svg><span>Data</span></button>
+      <button class="tool" id="help-button" title="Keyboard shortcuts (?)">?</button>
+    </div>
+  </div>
+
+  <!-- cinema captions -->
+  <div class="caption" id="caption" hidden>
+    <h2 id="caption-title"></h2>
+    <p id="caption-sub"></p>
+  </div>
+  <div class="tour-bar" id="tour-bar" hidden><span id="tour-fill"></span></div>
+
+  <div class="tooltip" id="tooltip" hidden></div>
+</main>
+
+<!-- ─────────────────────────────── overlays ─────────────────────────────── -->
+<div class="loading" id="loading" hidden>
+  <div class="loading-inner">
+    <div class="loading-orb" aria-hidden="true"><span></span><span></span><span></span></div>
+    <p class="loading-phase" id="loading-phase">Connecting…</p>
+    <p class="loading-detail" id="loading-detail"></p>
+    <div class="loading-bar"><span id="loading-fill"></span></div>
+    <button class="linkish" id="loading-cancel">Cancel</button>
+  </div>
+</div>
+
+<dialog class="help" id="help-dialog">
+  <h2>Controls</h2>
+  <ul class="keys">
+    <li><kbd>Drag</kbd> orbit</li>
+    <li><kbd>Scroll</kbd> zoom</li>
+    <li><kbd>Right-drag</kbd> pan</li>
+    <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch mode</li>
+    <li><kbd>T</kbd> play the tour</li>
+    <li><kbd>R</kbd> start / stop recording</li>
+    <li><kbd>P</kbd> save a PNG</li>
+    <li><kbd>F</kbd> focus the search box</li>
+    <li><kbd>Space</kbd> play / pause the timeline</li>
+    <li><kbd>0</kbd> reset the view</li>
+    <li><kbd>Esc</kbd> clear selection · stop the tour</li>
+  </ul>
+  <h2>Reading the structure</h2>
+  <ul class="legend-help">
+    <li><b>Ring</b> — how deep a file sits in the tree</li>
+    <li><b>Terrace</b> — a directory; everything it contains stands on it</li>
+    <li><b>Height</b> — file size, on a log scale</li>
+    <li><b>Colour</b> — language</li>
+    <li><b>Glow</b> — churn, when history is available</li>
+  </ul>
+  <form method="dialog"><button class="tool">Close</button></form>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
+<noscript>
+  <div class="noscript">RepoSense renders with WebGL and needs JavaScript enabled.</div>
+</noscript>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
