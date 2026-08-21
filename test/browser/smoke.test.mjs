@@ -61,6 +61,14 @@ before(async () => {
 }, { timeout: 120000 });
 
 after(async () => {
+  // Always leave the last frame on disk. CI uploads it when the job fails,
+  // which is the difference between "a test failed" and seeing what the page
+  // actually looked like.
+  try {
+    await page?.screenshot({ path: join(dirname(fileURLToPath(import.meta.url)), 'last-state.png') });
+  } catch {
+    /* the page may already be gone; the screenshot is a convenience */
+  }
   await browser?.close();
   server?.kill();
 });
