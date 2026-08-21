@@ -22,6 +22,10 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The bundled example is generated from this repo's own git log, so
+          # the deploy needs real history, not the default depth-1 clone.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -32,7 +36,7 @@ jobs:
       # broken module never reaches Pages.
       - name: Check sources parse
         run: |
-          for f in $(find src scripts -name '*.js' -o -name '*.mjs'); do
+          for f in $(find src scripts \( -name '*.js' -o -name '*.mjs' \)); do
             node --check "$f"
           done
 

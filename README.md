@@ -192,7 +192,22 @@ npm start          # http://localhost:4173
 ```
 
 `.github/workflows/pages.yml` deploys `main` to GitHub Pages. To host your own
-copy, fork it and enable Pages with **Source: GitHub Actions**.
+copy: fork it, then **Settings → Pages → Source: GitHub Actions**. There is no
+build step — the workflow syntax-checks the sources, regenerates the bundled
+example from the repo's own git log, and uploads the tree as-is.
+
+A few details that keep the deployed page the *whole* product rather than a
+static shell of it:
+
+- **`.nojekyll`** at the root stops GitHub from running the tree through Jekyll,
+  which would otherwise mangle `vendor/` and drop paths it considers private.
+- **Every path is relative** (`./src/…`, `./vendor/…`), including the import
+  map, so the app works unchanged at `/reposense/`, at a user site, or behind a
+  custom domain.
+- **Routing lives in the location hash**, so deep links, the browser Back
+  button, and refreshes all work with no server rewrite rules.
+- **`404.html`** bounces stray paths back into the app, and turns
+  `…/reposense/owner/repo` into `…/reposense/#/owner/repo`.
 
 ## License
 
