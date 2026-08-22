@@ -19,6 +19,7 @@ jobs:
   unit:
     name: Unit and CLI tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,6 +58,8 @@ jobs:
   browser:
     name: Browser smoke test
     runs-on: ubuntu-latest
+    # A wedged browser must not sit on the runner until the six-hour default.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
