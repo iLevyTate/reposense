@@ -202,6 +202,10 @@ async function main() {
 
     for (let i = 0; i < total; i += 1) {
       const t = opts.start + (i / opts.fps);
+      // seek() draws synchronously and screenshot() reads that draw, so no
+      // wait is needed. Yielding a frame first is actively wrong: it lets the
+      // DOM overlay settle by a variable amount, and measurably makes the same
+      // timestamp render differently from one capture to the next.
       await page.evaluate((time) => window.__reposense.seek(time), t);
       await page.screenshot({ path: join(frameDir, `f${String(i).padStart(6, '0')}.png`) });
       if (!opts.quiet && (i % 30 === 0 || i === total - 1)) {

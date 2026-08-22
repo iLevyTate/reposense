@@ -471,6 +471,17 @@ code, kbd, .mono { font-family: var(--mono); }
 .viewer.is-cinema .dock { opacity: 0; pointer-events: none; transition: opacity 0.5s; }
 .viewer.is-cinema .scanline { opacity: 0.09; }
 
+/* While recording, every frame is drawn at an explicit timestamp. Any CSS
+   transition or animation is driven by wall-clock time instead, so it would
+   bleed a different amount into each frame — the HUD's 0.5s fade-out was
+   landing half-drawn in the opening second of every recording. */
+.rs-recording *,
+.rs-recording *::before,
+.rs-recording *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 /* tooltip */
 .tooltip {
   position: absolute; z-index: 8; pointer-events: none;

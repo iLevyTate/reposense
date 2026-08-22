@@ -48,6 +48,9 @@ after(async () => {
   server?.kill();
 });
 
+// No frame yield between seek and capture: seek() draws synchronously, and
+// yielding lets the DOM overlay settle by a variable amount, which measurably
+// breaks the determinism this file exists to assert.
 const seek = async (t) => {
   await page.evaluate((time) => window.__reposense.seek(time), t);
   return page.screenshot();

@@ -392,6 +392,7 @@ async function present(payload) {
  */
 function installRecordHook() {
   if (!RECORDING) return;
+  document.documentElement.classList.add('rs-recording');
 
   window.__reposense = {
     duration: TOUR_DURATION,
