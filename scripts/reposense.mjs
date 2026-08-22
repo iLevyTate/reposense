@@ -44,6 +44,7 @@ function parseArgs(argv) {
     svg: null,
     theme: 'dark',
     width: 1280,
+    animate: false,
   };
   const rest = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -62,6 +63,7 @@ function parseArgs(argv) {
         opts.serve = false;
         opts.open = false;
         break;
+      case '--animate': opts.animate = true; break;
       case '--theme': opts.theme = argv[++i]; break;
       case '--width': opts.width = Number(argv[++i]) || 1280; break;
       case '-q': case '--quiet': opts.quiet = true; break;
@@ -86,6 +88,7 @@ Usage
 Options
   -o, --out <file>      where to write the JSON        (default reposense.json)
       --svg [file]      also render a static SVG        (default reposense.svg)
+      --animate         svg builds itself in on a loop (CSS, no script)
       --theme <name>    svg theme: dark or light                 (default dark)
       --width <px>      svg width; height follows the ratio     (default 1280)
   -c, --commits <n>     limit history to the newest n commits
@@ -101,6 +104,7 @@ Examples
   reposense ~/code/api --json      write ~/code/api's data to reposense.json
   reposense --no-history           structure only, skip the git log pass
   reposense --svg docs/repo.svg    render an SVG to embed in a README
+  reposense --svg r.svg --animate  the same, but it builds itself in on a loop
 `;
 
 /* ─────────────────────────────────────────────────────────────────── git ── */
@@ -492,7 +496,10 @@ async function main() {
       }
       const svgPath = resolve(opts.svg);
       await mkdir(dirname(svgPath), { recursive: true });
-      await writeFile(svgPath, renderSvg(payload, { theme: opts.theme, width: opts.width }));
+      await writeFile(
+        svgPath,
+        renderSvg(payload, { theme: opts.theme, width: opts.width, animate: opts.animate }),
+      );
       if (opts.quiet) console.log(svgPath);
       else log(`Wrote ${svgPath}`);
     }

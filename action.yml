@@ -23,6 +23,14 @@ inputs:
     description: SVG width in pixels. Height follows the drawing's own ratio.
     required: false
     default: '1280'
+  animate:
+    description: >-
+      Set to 'true' for an SVG that builds itself in on a loop. The motion is
+      CSS inside the image, so it plays in a README where a <script> would be
+      stripped, and it costs about 7% more bytes than the static render.
+      Readers who ask for reduced motion get the still frame.
+    required: false
+    default: 'false'
   commits:
     description: >-
       Limit history to the newest N commits. Leave empty to replay all of it.
@@ -71,6 +79,7 @@ runs:
         RS_OUTPUT: ${{ inputs.output }}
         RS_THEME: ${{ inputs.theme }}
         RS_WIDTH: ${{ inputs.width }}
+        RS_ANIMATE: ${{ inputs.animate }}
         RS_COMMITS: ${{ inputs.commits }}
         RS_HISTORY: ${{ inputs.history }}
         RS_JSON: ${{ inputs.json }}
@@ -96,6 +105,9 @@ runs:
         fi
         if [ "$RS_HISTORY" = "false" ]; then
           args+=(--no-history)
+        fi
+        if [ "$RS_ANIMATE" = "true" ]; then
+          args+=(--animate)
         fi
 
         before=""

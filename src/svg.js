@@ -61,7 +61,33 @@ const THEMES = {
   },
 };
 
+/** Rings beyond this share the last stagger step, so the CSS stays small. */
+const RING_CLASSES = 10;
+
 const n = (v) => (Math.abs(v) < 0.005 ? '0' : v.toFixed(2));
+
+/**
+ * Build-in animation, as CSS inside the SVG.
+ *
+ * GitHub strips <script> from SVG but renders it as an image, and CSS
+ * animation inside an image still runs — which is what lets a README show
+ * motion without shipping a multi-megabyte GIF.
+ *
+ * The cycle spends most of its length fully built, so a reader arriving at any
+ * moment sees the finished structure rather than a half-drawn one, and any
+ * renderer that ignores the CSS shows the final state anyway.
+ */
+function animationCss(rise) {
+  const rules = [];
+  for (let r = 0; r < RING_CLASSES; r += 1) {
+    rules.push(`.r${r}{animation:rs 14s cubic-bezier(.16,1,.3,1) ${(r * 0.28).toFixed(2)}s infinite}`);
+  }
+  return `<style>
+@keyframes rs{0%{opacity:0;transform:translateY(${n(rise)}px)}9%{opacity:1;transform:translateY(0)}88%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(${n(rise)}px)}}
+${rules.join('')}
+@media (prefers-reduced-motion:reduce){.r0,.r1,.r2,.r3,.r4,.r5,.r6,.r7,.r8,.r9{animation:none}}
+</style>`;
+}
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -94,6 +120,7 @@ export function renderSvg(payload, opts = {}) {
   const width = opts.width || 1280;
   const maxTowers = opts.maxTowers ?? 2200;
   const showLegend = opts.legend !== false;
+  const animate = !!opts.animate;
 
   const model = buildModel(payload, { maxFiles: maxTowers });
   const layout = computeLayout(model);
@@ -141,7 +168,7 @@ export function renderSvg(payload, opts = {}) {
     const base = shade(colorOf(d.lang), Math.max(0.4, 1 - d.depth * 0.1), theme.terraceTint, theme.terraceMix);
     shapes.push({
       depth: depthOf(Math.cos(d.aMid) * r0, Math.sin(d.aMid) * r0) - 1e6, // floors first
-      svg: `<path d="${path}" fill="${base}" fill-opacity="${theme.terraceAlpha}" stroke="${theme.stroke}" stroke-width=".5"/>`,
+      svg: `<path${animate ? ` class="r${Math.min(ring, RING_CLASSES - 1)}"` : ''} d="${path}" fill="${base}" fill-opacity="${theme.terraceAlpha}" stroke="${theme.stroke}" stroke-width=".5"/>`,
     });
   }
 
@@ -175,7 +202,13 @@ export function renderSvg(payload, opts = {}) {
       `<polygon points="${poly(top)}" fill="${shade(color, theme.faceTop)}"/>`,
     ];
 
-    shapes.push({ depth: depthOf(cx, cz), svg: faces.join('') });
+    const body = faces.join('');
+    shapes.push({
+      depth: depthOf(cx, cz),
+      // Wrapped rather than classed per face: three faces are one building, and
+      // one <g> is cheaper than three class attributes.
+      svg: animate ? `<g class="r${Math.min(f.ring, RING_CLASSES - 1)}">${body}</g>` : body,
+    });
   }
 
   shapes.sort((a, b) => a.depth - b.depth);
@@ -268,6 +301,7 @@ export function renderSvg(payload, opts = {}) {
 <stop offset="0%" stop-color="${theme.haze}" stop-opacity=".55"/><stop offset="100%" stop-color="${theme.haze}" stop-opacity="0"/>
 </radialGradient>
 </defs>
+${animate ? animationCss((maxY - minY) * 0.06) : ''}
 <rect x="${n(minX)}" y="${n(minY)}" width="${n(vbW)}" height="${n(vbH)}" fill="url(#bg)"/>
 <ellipse cx="0" cy="${n((minY + maxY) / 2)}" rx="${n(hazeR)}" ry="${n(hazeR * 0.5)}" fill="url(#haze)"/>
 ${shapes.map((s) => s.svg).join('')}

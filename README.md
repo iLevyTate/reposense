@@ -10,13 +10,15 @@ how recently it changed.
 
 [**Open the visualizer →**](https://ilevytate.github.io/reposense/)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="public/reposense-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="public/reposense-light.svg">
-  <img alt="RepoSense rendering its own repository as an isometric structure: concentric terraces stepping outward and upward, with a tower standing on each one for every file" src="public/reposense-dark.svg" width="100%">
-</picture>
+<a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/reposense-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="public/reposense-light.svg">
+    <img alt="RepoSense rendering its own repository as an isometric structure: concentric terraces stepping outward and upward, with a tower standing on each one for every file" src="public/reposense-dark.svg" width="100%">
+  </picture>
+</a>
 
-<sub>RepoSense rendering itself. This image is regenerated on every push — see <a href="#put-it-in-your-readme">Put it in your README</a>.</sub>
+<sub>RepoSense rendering itself — it builds in on a loop, and clicking it opens the same repository in the live explorer.<br>Regenerated on every push by <a href=".github/workflows/visualize.yml">one workflow</a>. See <a href="#put-it-in-your-readme">Put it in your README</a>.</sub>
 
 </div>
 
@@ -110,6 +112,7 @@ jobs:
       - uses: iLevyTate/reposense@main
         with:
           output: reposense.svg
+          animate: 'true'
           commit: 'true'
 ```
 
@@ -125,6 +128,7 @@ out as vector. A repository of a few thousand files lands in about 25 KB.
 | `output` | `reposense.svg` | Where to write the SVG |
 | `theme` | `dark` | `dark` or `light` |
 | `width` | `1280` | Width in px; height follows the drawing |
+| `animate` | `false` | Build the structure in on a loop |
 | `commits` | *(all)* | Cap history at the newest N commits |
 | `history` | `true` | `false` skips the git log pass entirely |
 | `json` | — | Also write the raw `reposense.json` here |
@@ -140,20 +144,45 @@ differs from what was already committed — useful for gating later steps).
 ![Repository structure](reposense.svg)
 ```
 
+Make it clickable so readers land in the live explorer on *your* repository:
+
+```markdown
+[![Repository structure](reposense.svg)](https://ilevytate.github.io/reposense/#/OWNER/REPO)
+```
+
 To serve both colour schemes, render twice and let the browser pick:
 
 ```html
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="reposense-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="reposense-light.svg">
-  <img alt="Repository structure" src="reposense-dark.svg" width="100%">
-</picture>
+<a href="https://ilevytate.github.io/reposense/#/OWNER/REPO">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="reposense-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="reposense-light.svg">
+    <img alt="Repository structure" src="reposense-dark.svg" width="100%">
+  </picture>
+</a>
 ```
 
 That is exactly what the image at the top of this file does — see
 [`.github/workflows/visualize.yml`](.github/workflows/visualize.yml), which
 renders both variants and commits them. The workflow skips its own bot commits,
 so it settles after one pass instead of looping.
+
+#### It moves, without being a GIF
+
+With `animate: 'true'` the structure builds itself in on a loop. The motion is
+CSS *inside* the SVG, which matters: GitHub strips `<script>` from embedded SVG
+but still runs stylesheets when the file is rendered as an image. So it animates
+in a README where anything script-driven would sit there dead — at about 7% more
+bytes than the still version, rather than the megabytes a GIF of the same thing
+would cost, and it stays sharp at any width.
+
+The cycle spends most of its length fully built, so a reader arriving at any
+moment sees the finished structure rather than a half-drawn one. Anything that
+ignores the CSS — and anyone who has asked their system for reduced motion —
+gets the still frame.
+
+If you specifically want a video, the web app records one: press **R** and it
+writes a WebM of the camera tour, including your own camera moves.
 
 Prefer not to commit an image? Point the Action at a temporary path and upload it
 as an artifact instead; every render is deterministic, so the same tree always

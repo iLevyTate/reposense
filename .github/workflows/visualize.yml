@@ -31,12 +31,14 @@ jobs:
         with:
           output: public/reposense-dark.svg
           theme: dark
+          animate: 'true'
 
       - name: Render the light variant
         uses: ./
         with:
           output: public/reposense-light.svg
           theme: light
+          animate: 'true'
 
       # Committed here rather than by the action, because two files are being
       # written and the action's own commit step only stages its own output.
