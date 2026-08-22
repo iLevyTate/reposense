@@ -51,9 +51,12 @@ git@github.com:charmbracelet/bubbletea.git
 Every view is linkable: `…/reposense/#/pallets/flask` loads that repo directly.
 
 > **On rate limits.** Anonymous GitHub API access allows 60 requests an hour per
-> IP and a repository costs about five, so you get roughly a dozen an hour. Add a
+> IP. The structure costs about five requests; the history replay that powers
+> Chronology costs one per commit, so anonymously it stops at the newest 40
+> commits and says so. Add a
 > [personal access token](https://github.com/settings/tokens) under **Options**
-> for 5,000 an hour and access to private repositories. It is stored in your
+> for 5,000 an hour, a replay of up to 1,000 commits, and access to private
+> repositories. It is stored in your
 > browser and sent only to `api.github.com` — there is no RepoSense server for it
 > to reach.
 
@@ -73,7 +76,7 @@ It exists because it is strictly better wherever it applies:
 | ------------------- | --------------------------- | ----------------- |
 | Private repositories | needs a token               | just works        |
 | Rate limits         | 60/hour anonymous           | none              |
-| Commit history      | recent slice, via deep scan | all of it         |
+| Commit history      | newest slice, on by default | all of it         |
 | Per-file authorship | deep scan only              | always            |
 | Growth timeline     | deep scan only              | always            |
 
@@ -296,10 +299,11 @@ rotates. Verified from 390×844 to 5120×1440.
 A visualization that quietly invents data is worse than none, so:
 
 - **Sizes and structure** are always real, straight from the git tree.
-- **Churn, authorship and creation dates** need history. The website has none by
-  default, because the commit-list API does not return file lists; the optional
-  **deep scan** opens recent commits one request each to recover them. The CLI
-  and the Action always have all of it.
+- **Churn, authorship and creation dates** need history. The commit-list API
+  does not return file lists, so the website's **deep scan** — on by default —
+  opens recent commits one request each to recover them, and the scrubber
+  labels exactly how many commits it covers. The CLI and the Action replay the
+  entire git log by default.
 - When history is missing, Chronology is **disabled** and the panel explains why,
   rather than animating something meaningless.
 - On very large repositories the smallest files fold into `…N more files` towers

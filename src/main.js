@@ -20,6 +20,18 @@ import { Timeline } from './ui/timeline.js';
 const $ = (id) => document.getElementById(id);
 const REVEAL_SECONDS = 2.6;
 
+/**
+ * The deep history scan costs one API request per commit, and anonymous
+ * callers get 60 requests/hour in total. History is on by default — the
+ * Chronology is the point of the product — so without a token the replay is
+ * clamped low enough to leave headroom for the base requests and a second
+ * load. A token raises the ceiling to 5,000/hour and lifts the clamp.
+ */
+const ANON_DEEP_SCAN_MAX = 40;
+
+/** How long, in wall-clock seconds, a newly created file flares during playback. */
+const FLASH_WALL_SECONDS = 0.9;
+
 /** Offline recording drives frames by timestamp; nothing transient may appear. */
 const RECORDING = new URLSearchParams(location.search).has('record');
 const TIMELINE_SWEEP_SECONDS = 24;
@@ -250,11 +262,18 @@ async function loadFromRoute() {
   }
 
   $('repo-input').value = `${repo.owner}/${repo.name}`;
-  const deepScan = $('deep-scan').checked ? Number($('deep-count').value) : 0;
+  const wanted = $('deep-scan').checked ? Number($('deep-count').value) : 0;
+  const deepScan = getToken() ? wanted : Math.min(wanted, ANON_DEEP_SCAN_MAX);
 
-  await withLoading(async (signal) =>
-    fetchRepo(repo, { signal, deepScan, onProgress: (p) => app.hud.setProgress(p) }),
-  );
+  await withLoading(async (signal) => {
+    const payload = await fetchRepo(repo, { signal, deepScan, onProgress: (p) => app.hud.setProgress(p) });
+    // Surface the clamp in the composition notes rather than silently
+    // delivering less history than the slider asked for — but only when the
+    // clamp actually bit. A repository with fewer commits than the clamp ran
+    // out of history, not out of budget.
+    if (deepScan < wanted && payload.scan?.commits >= deepScan) payload.scan.clamped = true;
+    return payload;
+  });
 }
 
 /** Shared loading shell: progress overlay, cancellation, error routing. */
@@ -364,7 +383,12 @@ async function present(payload) {
     });
   }
   const canTime = app.model.stats.lastTouched > 0;
-  if (canTime) app.timeline.setData(app.model, timeRange());
+  if (canTime) {
+    app.timeline.setData(app.model, timeRange());
+    $('time-measure').textContent = describeCoverage(payload, app.timeline);
+  } else {
+    $('time-measure').textContent = ''; // never inherit a previous repo's coverage
+  }
   document.querySelector('[data-mode="chronology"]').disabled = !canTime;
   document.querySelector('[data-mode="constellation"]').disabled = app.constellation.empty;
 
@@ -704,6 +728,22 @@ function setMode(mode) {
 
 /* ════════════════════════════════════════════════════════════ chronology ══ */
 
+/**
+ * One line under the scrubber saying what the bars measure and how much
+ * history is behind them, so a partial replay never masquerades as the full
+ * log. The CLI replays everything by default; the API path says how many
+ * commits it opened.
+ */
+function describeCoverage(payload, timeline) {
+  const scan = payload.scan;
+  const what = timeline.describe();
+  if (!scan?.commits) return what;
+  if (scan.source === 'git log' && !scan.limited) {
+    return `${what} · full git log (${scan.commits.toLocaleString()} commits)`;
+  }
+  return `${what} · newest ${scan.commits.toLocaleString()} commits`;
+}
+
 function timeRange() {
   const s = app.model.stats;
   const start = s.firstTouched || s.lastTouched - 86400 * 365;
@@ -716,7 +756,12 @@ function setTime(t01) {
   app.timeT = Math.min(1, Math.max(0, t01));
   const { start, end } = timeRange();
   const t = start + (end - start) * app.timeT;
-  const { visible, bytes } = app.arcology.applyTime(t, { hasHistory: app.model.stats.hasHistory });
+  // The creation flare should last a fixed slice of *wall-clock* playback, so
+  // its length in history-seconds scales with how much history the sweep
+  // covers. Passing it as a window keeps the flare a pure function of the
+  // timestamp — identical live, scrubbed, or recorded offline at any fps.
+  const flashWindow = ((end - start) / TIMELINE_SWEEP_SECONDS) * FLASH_WALL_SECONDS;
+  const { visible, bytes } = app.arcology.applyTime(t, { hasHistory: app.model.stats.hasHistory, flashWindow });
   $('time-range').value = String(Math.round(app.timeT * 1000));
 
   app.timeline?.setPosition(app.timeT);

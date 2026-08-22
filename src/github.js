@@ -4,10 +4,11 @@
  * Everything runs in the browser against api.github.com, which serves CORS
  * headers, so RepoSense needs no backend and deploys as static files.
  *
- * Unauthenticated callers get 60 requests/hour per IP. A full repository costs
- * about five, so the anonymous path is fine for casual use; a personal access
- * token (kept in localStorage, never transmitted anywhere but GitHub) raises
- * the ceiling to 5000/hour and unlocks private repositories.
+ * Unauthenticated callers get 60 requests/hour per IP. The structure costs
+ * about five requests; the deep history scan costs one more per commit, which
+ * is why main.js clamps it for anonymous callers. A personal access token
+ * (kept in localStorage, never transmitted anywhere but GitHub) raises the
+ * ceiling to 5000/hour and lifts the clamp.
  */
 
 import { languageOf } from './palette.js';

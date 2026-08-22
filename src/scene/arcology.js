@@ -580,13 +580,12 @@ export class Arcology {
    * one, every file stays present and only the heat responds. That distinction
    * is surfaced in the HUD so the timeline is never silently lying.
    */
-  applyTime(t, { hasHistory, window: win = 60 * 60 * 24 * 45 }) {
+  applyTime(t, { hasHistory, window: win = 60 * 60 * 24 * 45, flashWindow = 0 }) {
     const appear = this.attrs.aAppear.array;
     const heat = this.attrs.aHeat.array;
     const flash = this.attrs.aFlash.array;
     let visible = 0;
     let bytes = 0;
-    let appeared = 0;
 
     for (let i = 0; i < appear.length; i += 1) {
       const f = this.fileByInstance[i];
@@ -598,14 +597,23 @@ export class Arcology {
       } else if (hasHistory) {
         present = 1;
       }
-      // Flare on the transition into existence, then decay. Scrubbing backwards
-      // must not flare — going back in time is not a creation event.
-      if (present > 0.02 && appear[i] <= 0.02) {
-        flash[i] = 1;
-        appeared += 1;
-      } else if (flash[i] > 0) {
-        flash[i] = Math.max(0, flash[i] - 0.06);
+      // The creation flare is a pure function of the timestamp: a file glows
+      // white for `flashWindow` seconds of history after it appears, then
+      // settles into its language colour. Stateless on purpose — an earlier
+      // version decayed a stored value per frame, which made the flare last
+      // twice as long at 30fps as at 60 and drift between live playback and
+      // offline recording. Computed from `t` alone, every path that draws a
+      // frame agrees exactly, and pausing the playhead leaves the files just
+      // created still glowing — a marker of what this stretch of history added.
+      let flare = 0;
+      if (hasHistory && f.addedAt && flashWindow > 0) {
+        const age = t - f.addedAt;
+        if (age >= 0 && age < flashWindow) {
+          flare = 1 - age / flashWindow;
+          flare *= flare;
+        }
       }
+      flash[i] = flare;
 
       appear[i] = present;
       if (present > 0.02) {
@@ -623,7 +631,7 @@ export class Arcology {
     this.attrs.aAppear.needsUpdate = true;
     this.attrs.aHeat.needsUpdate = true;
     this.attrs.aFlash.needsUpdate = true;
-    return { visible, bytes, appeared };
+    return { visible, bytes };
   }
 
   /** Restores the static (non-playback) appearance. */

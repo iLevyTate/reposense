@@ -121,6 +121,16 @@ export class Hud {
     if (!s.hasChurn) {
       notes.push('No history data: run a deep scan, or generate a file with the local CLI, to light the towers by churn.');
     }
+    const scan = model.payload.scan;
+    if (scan?.partial) {
+      notes.push(
+        `History replay stopped at ${scan.commits.toLocaleString()} commits when the API rate limit ran out. Add a token, or use the local CLI, for the full log.`,
+      );
+    } else if (scan?.clamped) {
+      notes.push(
+        `History covers the newest ${scan.commits.toLocaleString()} commits — the anonymous API allows 60 requests/hour. Add a token to replay up to 1,000, or use the local CLI for everything.`,
+      );
+    }
     this.el.modelNote.hidden = notes.length === 0;
     this.el.modelNote.innerHTML = notes.map(esc).join('<br><br>');
   }

@@ -127,10 +127,18 @@ test('hovering a tower opens the inspector', async () => {
 
 test('search filters and lists matches', async () => {
   await page.fill('#search-input', 'scene');
-  await page.waitForTimeout(400);
+  // The search is debounced and the render loop shares the main thread with a
+  // software rasteriser here — wait for the result, not a fixed delay.
+  await page.waitForFunction(
+    () => document.querySelectorAll('#hitlist button').length > 0,
+    { timeout: 15000 },
+  );
   assert.ok(await page.locator('#hitlist button').count() > 0);
   await page.fill('#search-input', '');
-  await page.waitForTimeout(300);
+  await page.waitForFunction(
+    () => document.querySelectorAll('#hitlist button').length === 0,
+    { timeout: 15000 },
+  );
 });
 
 test('every enabled mode activates', async () => {
@@ -141,6 +149,21 @@ test('every enabled mode activates', async () => {
     await page.waitForTimeout(700);
     assert.ok(await btn.evaluate((el) => el.classList.contains('is-active')), `${mode} activates`);
   }
+});
+
+test('chronology says what its bars measure and how much history it has', async () => {
+  await page.click('[data-mode="chronology"]');
+  await page.waitForTimeout(400);
+  assert.ok(await page.isVisible('#timeline'), 'the timeline dock appears');
+  assert.ok(await page.locator('#time-spark rect').count() > 0, 'the activity strip has bars');
+  // A chart whose measure has to be guessed is not explained: the label must
+  // name the unit and the coverage, so a partial replay can never pass itself
+  // off as the full log.
+  const measure = await page.locator('#time-measure').innerText();
+  assert.match(measure, /per period/, 'the measure is named');
+  assert.match(measure, /full git log|newest [\d,]+ commits/, 'the coverage is named');
+  await page.click('[data-mode="arcology"]');
+  await page.waitForTimeout(300);
 });
 
 test('the tour hides the HUD and always gives it back', async () => {
@@ -173,6 +196,43 @@ test('returning to the launch screen leaves it alive', async () => {
       }),
   );
   assert.ok(animating, 'the launch backdrop is still animating');
+});
+
+test('a phone-sized viewport gets a usable viewer', async () => {
+  const phone = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const phoneErrors = [];
+  phone.on('pageerror', (e) => phoneErrors.push(String(e.message)));
+  try {
+    await phone.goto(`${BASE}#/demo`, { waitUntil: 'domcontentloaded' });
+    await phone.waitForSelector('#viewer:not([hidden])', { timeout: 60000 });
+    await phone.waitForTimeout(1500);
+
+    // The page must not scroll sideways — a horizontal overflow on a phone
+    // means some fixed-width element is wider than the screen.
+    assert.ok(
+      await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      'no horizontal overflow',
+    );
+
+    // The dock (modes + tools) must be on screen and inside the viewport.
+    const dock = await phone.locator('#dock').boundingBox();
+    assert.ok(dock, 'the dock renders');
+    assert.ok(dock.x >= 0 && dock.x + dock.width <= 390.5, 'the dock fits the width');
+
+    // Chronology stays usable: the strip stretches instead of collapsing.
+    await phone.click('[data-mode="chronology"]');
+    await phone.waitForTimeout(400);
+    const track = await phone.locator('#time-track').boundingBox();
+    assert.ok(track && track.width > 100, 'the activity strip has room to scrub');
+
+    assert.deepEqual(phoneErrors, [], 'no JavaScript errors on the phone viewport');
+  } finally {
+    await phone.close();
+  }
 });
 
 test('nothing threw and no asset failed to load', () => {
