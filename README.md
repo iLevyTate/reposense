@@ -127,16 +127,58 @@ out as vector. A repository of a few thousand files lands in about 25 KB.
 | `path` | `.` | Directory to scan |
 | `output` | `reposense.svg` | Where to write the SVG |
 | `theme` | `dark` | `dark` or `light` |
-| `width` | `1280` | Width in px; height follows the drawing |
-| `animate` | `false` | Build the structure in on a loop |
+| `width` | `1280` | Width in px; height follows the drawing (SVG) or the frame (video) |
+| `animate` | `false` | Build the structure in on a loop (SVG) |
+| `height` | `720` | Frame height, video only |
+| `fps` | `30` | Frames per second, video only |
+| `seconds` | *(full tour)* | Video length — the whole tour is about 48s |
+| `chrome` | `false` | Keep the HUD visible in video |
 | `commits` | *(all)* | Cap history at the newest N commits |
 | `history` | `true` | `false` skips the git log pass entirely |
 | `json` | — | Also write the raw `reposense.json` here |
 | `commit` | `false` | Commit the result back to the branch |
 | `commit-message` | *(see `action.yml`)* | Message used when committing |
 
-Outputs: `svg` (path), `files` (count), and `changed` (`true` when the render
-differs from what was already committed — useful for gating later steps).
+Outputs: `output` (path), `format`, `files` (count), and `changed` (`true` when
+the render differs from what was already committed — useful for gating later
+steps). `svg` remains as an alias for `output`.
+
+### Video and GIF
+
+The `output` extension picks the format. `.svg` needs nothing installed; `.gif`,
+`.mp4` and `.webm` render the full cinematic tour through a headless browser and
+encode it with ffmpeg, both of which the action installs into its own directory
+when asked for.
+
+```yaml
+      - uses: iLevyTate/reposense@main
+        with:
+          output: docs/tour.mp4
+          seconds: '20'
+          fps: '30'
+```
+
+Frames are requested by timestamp rather than captured in real time, so a runner
+falling back to software rasterisation still produces smooth output — it simply
+takes longer to render, never choppier.
+
+**Which format to embed.** Measured on this repository:
+
+| | 480×270, 6s | 640×360, 8s |
+| --- | --- | --- |
+| Animated SVG | **24 KB** | **24 KB** |
+| GIF | 1.5 MB | 3.6 MB |
+| MP4 | 214 KB | 422 KB |
+
+For a README, prefer the **animated SVG**: it is two orders of magnitude smaller
+than the GIF, stays sharp at any width, and renders inline from a repository
+path. Reach for GIF only if you need a raster the SVG cannot give you.
+
+MP4 and WebM are the best-looking and smallest of the three, but a repository
+path to one does **not** play inline in a README — GitHub only renders a video
+player for files uploaded through its own comment or release attachments. Use
+them for release notes, issues, and social posts, and link to them from the
+README.
 
 ### Put it in your README
 
@@ -181,8 +223,9 @@ moment sees the finished structure rather than a half-drawn one. Anything that
 ignores the CSS — and anyone who has asked their system for reduced motion —
 gets the still frame.
 
-If you specifically want a video, the web app records one: press **R** and it
-writes a WebM of the camera tour, including your own camera moves.
+If you want a video instead, there are two ways: the Action renders one in CI
+(see [Video and GIF](#video-and-gif)), or the web app records one live — press
+**R** and it writes a WebM of the tour, including your own camera moves.
 
 Prefer not to commit an image? Point the Action at a temporary path and upload it
 as an artifact instead; every render is deterministic, so the same tree always
@@ -289,6 +332,7 @@ src/
     cinema.js         scripted camera tour, WebM recorder
   ui/hud.js           panels, inspector, tooltip, toasts
 scripts/reposense.mjs the local scanner (zero dependencies)
+scripts/record.mjs    offline recorder: tour -> gif / mp4 / webm
 action.yml            the GitHub Action
 vendor/three/         three.js, vendored so there is no CDN dependency
 ```
@@ -310,6 +354,12 @@ A few decisions worth knowing if you dig in:
   vendored dependency stretching one thin arm into the distance.
 - **The layout engine is pure maths** — no DOM, no three.js. That is what lets the
   Action reuse it to render SVG in a runner with no browser.
+- **The recorder asks for frames by timestamp**, it does not capture in real
+  time. Every animation is a function of the tour clock, so a frame is
+  reproducible; a slow machine takes longer but never drops or smears one. The
+  single-frame render path deliberately skips `controls.update()`, because
+  damping is stateful and would make the same timestamp depend on what was
+  rendered before it.
 
 ### Running it locally
 

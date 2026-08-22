@@ -19,6 +19,9 @@ import { Timeline } from './ui/timeline.js';
 
 const $ = (id) => document.getElementById(id);
 const REVEAL_SECONDS = 2.6;
+
+/** Offline recording drives frames by timestamp; nothing transient may appear. */
+const RECORDING = new URLSearchParams(location.search).has('record');
 const TIMELINE_SWEEP_SECONDS = 24;
 
 const app = {
@@ -326,7 +329,9 @@ async function present(payload) {
     });
     wireViewer();
     app.stage.onUpdate(tick);
-    app.stage.start();
+    // With ?record=1 the recorder drives frames itself; a running loop would
+    // race it and blur the output.
+    if (!RECORDING) app.stage.start();
   }
 
   app.arcology = new Arcology(app.model, app.layout);
@@ -375,6 +380,49 @@ async function present(payload) {
   app.hud.toast(`${app.model.stats.fileCount.toLocaleString()} files from ${src}`);
 
   updateShareUrl(payload);
+  installRecordHook();
+}
+
+/**
+ * Offline recording hook.
+ *
+ * Exposed only with ?record=1 so it never sits on the public page. The recorder
+ * asks for frames by timestamp rather than watching a clock, which is what keeps
+ * exported video smooth on a CI runner rendering a few frames per second.
+ */
+function installRecordHook() {
+  if (!RECORDING) return;
+
+  window.__reposense = {
+    duration: TOUR_DURATION,
+    /** Renders exactly one frame of the tour at `t` seconds. */
+    seek(t) {
+      // The reveal is a load-time flourish, not part of the tour.
+      app.revealStart = null;
+      app.arcology.setLift(LIFT);
+      app.arcology.setFade(0);
+
+      const { shot } = app.cinema.applyAt(t);
+      if (shot.mode) applyTourMode(shot.mode);
+      app.hud.showCaption(shot);
+
+      if (app.mode === 'chronology') {
+        // Mirror the live tour's scrub window so the recorded history sweep
+        // lands on "today" at the end of the shot.
+        setTime(Math.min(1, Math.max(0, (t / TOUR_DURATION - 0.55) / 0.28)));
+      }
+
+      app.arcology.update(1 / 60, t, app.stage.camera);
+      app.constellation?.update(1 / 60, t);
+      app.stage.renderOnce(t);
+    },
+    /** Hides the HUD so the recording is the scene alone. */
+    setChrome(on) {
+      $('viewer').classList.toggle('is-cinema', !on);
+      app.hud.showTooltip(null);
+    },
+  };
+  document.documentElement.dataset.recordReady = '1';
 }
 
 function updateShareUrl(payload) {
@@ -850,6 +898,10 @@ function tick(dt, time) {
 /* ═══════════════════════════════════════════════════════════════════ boot ══ */
 
 function boot() {
+  if (RECORDING) {
+    app.hud.silent = true;
+    app.hud.animateCaptions = false;
+  }
   if (!hasWebGL()) {
     document.body.innerHTML =
       '<div class="noscript">RepoSense needs WebGL, which this browser has disabled or does not support.</div>';

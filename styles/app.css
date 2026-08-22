@@ -449,7 +449,11 @@ code, kbd, .mono { font-family: var(--mono); }
 /* captions */
 .caption {
   position: absolute; left: 50%; bottom: 20%; transform: translateX(-50%);
-  text-align: center; pointer-events: none; z-index: 3;
+  text-align: center; pointer-events: none; z-index: 6;
+  /* A soft scrim so the caption stays legible over the structure and its
+     labels, which float wherever the geometry puts them. */
+  padding: 26px 64px;
+  background: radial-gradient(60% 120% at 50% 50%, rgba(2, 5, 12, 0.82), rgba(2, 5, 12, 0) 72%);
   animation: capIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes capIn { from { opacity: 0; transform: translate(-50%, 14px); letter-spacing: 0.2em; } }

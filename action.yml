@@ -12,9 +12,30 @@ inputs:
     required: false
     default: '.'
   output:
-    description: Where to write the SVG, relative to the workspace.
+    description: >-
+      Where to write the result, relative to the workspace. The extension picks
+      the format: .svg, .gif, .mp4 or .webm.
     required: false
     default: reposense.svg
+  seconds:
+    description: >-
+      Video length. Defaults to the full cinematic tour (~48s). Only used for
+      gif/mp4/webm. A GIF of more than a few seconds gets large fast — prefer
+      mp4 or webm for anything long.
+    required: false
+    default: ''
+  fps:
+    description: Frames per second for video output.
+    required: false
+    default: '30'
+  height:
+    description: Frame height for video output. Width comes from `width`.
+    required: false
+    default: '720'
+  chrome:
+    description: Set to 'true' to keep the HUD visible in video output.
+    required: false
+    default: 'false'
   theme:
     description: 'dark or light. Render twice to serve both — see the README.'
     required: false
@@ -58,8 +79,14 @@ inputs:
     default: 'chore: update RepoSense visualization'
 
 outputs:
+  output:
+    description: Path to the rendered file.
+    value: ${{ steps.render.outputs.output }}
+  format:
+    description: 'svg, gif, mp4 or webm — taken from the output extension.'
+    value: ${{ steps.render.outputs.format }}
   svg:
-    description: Path to the rendered SVG.
+    description: Deprecated alias for `output`.
     value: ${{ steps.render.outputs.svg }}
   files:
     description: Number of files found in the repository.
@@ -79,6 +106,10 @@ runs:
         RS_OUTPUT: ${{ inputs.output }}
         RS_THEME: ${{ inputs.theme }}
         RS_WIDTH: ${{ inputs.width }}
+        RS_HEIGHT: ${{ inputs.height }}
+        RS_FPS: ${{ inputs.fps }}
+        RS_SECONDS: ${{ inputs.seconds }}
+        RS_CHROME: ${{ inputs.chrome }}
         RS_ANIMATE: ${{ inputs.animate }}
         RS_COMMITS: ${{ inputs.commits }}
         RS_HISTORY: ${{ inputs.history }}
@@ -91,23 +122,15 @@ runs:
         # moment the test is false, which would abort this action whenever the
         # output did not already exist.
 
-        # The scanner has no dependencies, so there is nothing to install.
+        format="${RS_OUTPUT##*.}"
+        case "$format" in
+          svg|gif|mp4|webm) ;;
+          *) echo "::error::output must end in .svg, .gif, .mp4 or .webm (got .$format)"; exit 1 ;;
+        esac
+
         json_path="$RS_JSON"
         if [ -z "$json_path" ]; then
-          # --svg implies no viewer; park the JSON somewhere disposable so the
-          # action leaves only the file the caller asked for.
           json_path="$RUNNER_TEMP/reposense.json"
-        fi
-
-        args=("$RS_PATH" --svg "$RS_OUTPUT" --theme "$RS_THEME" --width "$RS_WIDTH" --out "$json_path")
-        if [ -n "$RS_COMMITS" ]; then
-          args+=(--commits "$RS_COMMITS")
-        fi
-        if [ "$RS_HISTORY" = "false" ]; then
-          args+=(--no-history)
-        fi
-        if [ "$RS_ANIMATE" = "true" ]; then
-          args+=(--animate)
         fi
 
         before=""
@@ -115,7 +138,43 @@ runs:
           before=$(git hash-object "$RS_OUTPUT")
         fi
 
-        node "$GITHUB_ACTION_PATH/scripts/reposense.mjs" "${args[@]}"
+        # The scan itself has no dependencies.
+        scan=("$RS_PATH" --out "$json_path")
+        if [ -n "$RS_COMMITS" ]; then
+          scan+=(--commits "$RS_COMMITS")
+        fi
+        if [ "$RS_HISTORY" = "false" ]; then
+          scan+=(--no-history)
+        fi
+
+        if [ "$format" = "svg" ]; then
+          scan+=(--svg "$RS_OUTPUT" --theme "$RS_THEME" --width "$RS_WIDTH")
+          if [ "$RS_ANIMATE" = "true" ]; then
+            scan+=(--animate)
+          fi
+          node "$GITHUB_ACTION_PATH/scripts/reposense.mjs" "${scan[@]}"
+        else
+          # Video needs a browser to render frames and ffmpeg to encode them.
+          # Both are installed inside the action's own directory so the caller's
+          # workspace and node_modules are left untouched.
+          scan+=(--json)
+          node "$GITHUB_ACTION_PATH/scripts/reposense.mjs" "${scan[@]}"
+
+          echo "::group::Installing the renderer"
+          npm ci --prefix "$GITHUB_ACTION_PATH" --no-audit --no-fund
+          "$GITHUB_ACTION_PATH/node_modules/.bin/playwright" install --with-deps chromium
+          echo "::endgroup::"
+
+          rec=(--data "$json_path" --out "$RS_OUTPUT"
+               --width "$RS_WIDTH" --height "$RS_HEIGHT" --fps "$RS_FPS")
+          if [ -n "$RS_SECONDS" ]; then
+            rec+=(--seconds "$RS_SECONDS")
+          fi
+          if [ "$RS_CHROME" = "true" ]; then
+            rec+=(--chrome)
+          fi
+          node "$GITHUB_ACTION_PATH/scripts/record.mjs" "${rec[@]}"
+        fi
 
         after=$(git hash-object "$RS_OUTPUT")
         if [ "$before" = "$after" ]; then
@@ -132,11 +191,13 @@ runs:
 
         {
           echo "svg=$RS_OUTPUT"
+          echo "output=$RS_OUTPUT"
+          echo "format=$format"
           echo "files=$files"
           echo "changed=$changed"
         } >> "$GITHUB_OUTPUT"
 
-        echo "Rendered $RS_OUTPUT from $files files (changed: $changed)"
+        echo "Rendered $RS_OUTPUT ($format) from $files files (changed: $changed)"
 
     - name: Commit
       if: ${{ inputs.commit == 'true' && steps.render.outputs.changed == 'true' }}

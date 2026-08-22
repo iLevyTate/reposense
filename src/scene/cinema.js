@@ -86,6 +86,7 @@ const SHOTS = [
 ];
 
 export const TOUR_DURATION = SHOTS.reduce((s, x) => s + x.duration, 0);
+export { SHOTS };
 
 export class Cinema {
   constructor(stage, { onShot, onProgress, onEnd } = {}) {
@@ -269,10 +270,30 @@ export class Cinema {
       return;
     }
 
+    const shot = this.applyAt(this.time);
+    if (this.shotIndex !== shot.index) {
+      this.shotIndex = shot.index;
+      this.onShot(shot.shot, shot.index);
+    }
+    this.onProgress(this.time / TOUR_DURATION);
+  }
+
+  /**
+   * Places the camera for an absolute point in the tour, without advancing any
+   * clock.
+   *
+   * This is what makes offline recording possible: a frame can be asked for by
+   * timestamp and comes back identical however long the renderer took, so a
+   * runner managing three frames a second still produces smooth 60fps output.
+   *
+   * @param {number} t seconds into the tour
+   * @returns {{shot: object, index: number, local: number}}
+   */
+  applyAt(t) {
     let acc = 0;
     let index = 0;
     for (let i = 0; i < SHOTS.length; i += 1) {
-      if (this.time < acc + SHOTS[i].duration) {
+      if (t < acc + SHOTS[i].duration) {
         index = i;
         break;
       }
@@ -280,23 +301,20 @@ export class Cinema {
       index = i;
     }
     const shot = SHOTS[index];
-    const local = Math.min(1, (this.time - acc) / shot.duration);
-
-    if (index !== this.shotIndex) {
-      this.shotIndex = index;
-      this.onShot(shot, index);
-    }
+    const local = Math.min(1, Math.max(0, (t - acc) / shot.duration));
 
     const spec = Cinema.lerpSpec(shot.from, shot.to, shot.ease(local));
     const { pos, target } = this.#resolve(spec);
     // A slow handheld drift keeps the tour from feeling like a turntable render.
-    const wobble = this.time * 0.4;
+    // Derived from t, not from elapsed time, so it is reproducible frame to frame.
+    const wobble = t * 0.4;
     pos.x += Math.sin(wobble) * this.radius * 0.012;
     pos.y += Math.cos(wobble * 0.77) * this.radius * 0.009;
 
     this.stage.camera.position.copy(pos);
     this.stage.controls.target.copy(target);
-    this.onProgress(this.time / TOUR_DURATION);
+    this.stage.camera.lookAt(target);
+    return { shot, index, local };
   }
 }
 

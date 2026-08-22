@@ -167,6 +167,21 @@ export class Stage {
     loop();
   }
 
+  /**
+   * Renders a single frame at an explicit scene time, outside the animation
+   * loop. Used by the offline recorder, which drives time itself.
+   */
+  renderOnce(time) {
+    this.starfield.userData.material.uniforms.uTime.value = time;
+    this.starfield.rotation.y = time * 0.006;
+    // Deliberately no controls.update(): damping is stateful, so it would drag
+    // the camera toward wherever the previous frame left it and the same
+    // timestamp would render differently depending on what came before. The
+    // recorder positions the camera outright.
+    this.composer.render();
+    this.labelRenderer.render(this.scene, this.camera);
+  }
+
   stop() {
     this.running = false;
     if (this.frame) cancelAnimationFrame(this.frame);
