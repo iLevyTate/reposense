@@ -37,6 +37,10 @@ export class Hud {
       loadingFill: $('loading-fill'),
     };
     this.onFocusFile = () => {};
+    // Offline recording drives frames by timestamp, so CSS entrance animations
+    // and transient toasts have no meaningful time to play against.
+    this.silent = false;
+    this.animateCaptions = true;
   }
 
   /* ------------------------------------------------------------ repo header */
@@ -217,10 +221,20 @@ export class Hud {
       this.el.caption.hidden = true;
       return;
     }
+    const same = this.el.captionTitle.textContent === shot.caption;
     this.el.captionTitle.textContent = shot.caption;
     this.el.captionSub.textContent = shot.sub || '';
     this.el.caption.hidden = false;
-    // Retrigger the entrance animation on every shot change.
+
+    if (!this.animateCaptions) {
+      // Every seek would otherwise restart the fade-in, and a frame captured
+      // straight afterwards catches it at opacity 0 — captions never appeared
+      // in a recording at all.
+      this.el.caption.style.animation = 'none';
+      this.el.caption.style.opacity = '1';
+      return;
+    }
+    if (same) return; // only retrigger when the shot actually changes
     this.el.caption.style.animation = 'none';
     void this.el.caption.offsetWidth;
     this.el.caption.style.animation = '';
@@ -245,6 +259,7 @@ export class Hud {
   /* ------------------------------------------------------------------ toast */
 
   toast(message, { error = false, ms = 3200 } = {}) {
+    if (this.silent) return;
     const el = this.el.toast;
     el.textContent = message;
     el.classList.toggle('is-error', error);

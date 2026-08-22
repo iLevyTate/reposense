@@ -187,7 +187,15 @@
         <svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 3l8 5-8 5V3z"/></svg>
         <svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" hidden><path fill="currentColor" d="M4 3h3v10H4zM9 3h3v10H9z"/></svg>
       </button>
-      <input type="range" id="time-range" min="0" max="1000" value="1000" aria-label="History position" />
+      <div class="time-track" id="time-track">
+        <svg class="time-spark" id="time-spark" aria-hidden="true"></svg>
+        <span class="time-playhead" id="time-playhead"></span>
+        <span class="time-hover" id="time-hover" hidden></span>
+        <!-- The native range sits transparently on top so dragging and keyboard
+             control keep working exactly as the platform provides them. -->
+        <input type="range" id="time-range" min="0" max="1000" value="1000"
+               aria-label="History position" />
+      </div>
       <div class="time-read">
         <strong id="time-date">—</strong>
         <span id="time-detail"></span>

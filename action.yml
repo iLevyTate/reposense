@@ -1,0 +1,219 @@
+name: RepoSense
+description: Render a repository as a cinematic isometric SVG you can embed in your README.
+author: iLevyTate
+
+branding:
+  icon: layers
+  color: blue
+
+inputs:
+  path:
+    description: Directory to scan, relative to the workspace.
+    required: false
+    default: '.'
+  output:
+    description: >-
+      Where to write the result, relative to the workspace. The extension picks
+      the format: .svg, .gif, .mp4 or .webm.
+    required: false
+    default: reposense.svg
+  seconds:
+    description: >-
+      Video length. Defaults to the full cinematic tour (~48s). Only used for
+      gif/mp4/webm. A GIF of more than a few seconds gets large fast — prefer
+      mp4 or webm for anything long.
+    required: false
+    default: ''
+  fps:
+    description: Frames per second for video output.
+    required: false
+    default: '30'
+  height:
+    description: Frame height for video output. Width comes from `width`.
+    required: false
+    default: '720'
+  chrome:
+    description: Set to 'true' to keep the HUD visible in video output.
+    required: false
+    default: 'false'
+  theme:
+    description: 'dark or light. Render twice to serve both — see the README.'
+    required: false
+    default: dark
+  width:
+    description: SVG width in pixels. Height follows the drawing's own ratio.
+    required: false
+    default: '1280'
+  animate:
+    description: >-
+      Set to 'true' for an SVG that builds itself in on a loop. The motion is
+      CSS inside the image, so it plays in a README where a <script> would be
+      stripped, and it costs about 7% more bytes than the static render.
+      Readers who ask for reduced motion get the still frame.
+    required: false
+    default: 'false'
+  commits:
+    description: >-
+      Limit history to the newest N commits. Leave empty to replay all of it.
+      History supplies churn and authorship; it does not affect the structure.
+    required: false
+    default: ''
+  history:
+    description: Set to 'false' to skip the git log pass entirely (much faster on huge repos).
+    required: false
+    default: 'true'
+  json:
+    description: Optionally also write the raw reposense.json to this path.
+    required: false
+    default: ''
+  commit:
+    description: >-
+      Set to 'true' to commit the rendered file back to the branch. Requires
+      `permissions: contents: write` and an `actions/checkout` step. Nothing is
+      committed when the render is unchanged.
+    required: false
+    default: 'false'
+  commit-message:
+    description: Commit message used when `commit` is true.
+    required: false
+    default: 'chore: update RepoSense visualization'
+
+outputs:
+  output:
+    description: Path to the rendered file.
+    value: ${{ steps.render.outputs.output }}
+  format:
+    description: 'svg, gif, mp4 or webm — taken from the output extension.'
+    value: ${{ steps.render.outputs.format }}
+  svg:
+    description: Deprecated alias for `output`.
+    value: ${{ steps.render.outputs.svg }}
+  files:
+    description: Number of files found in the repository.
+    value: ${{ steps.render.outputs.files }}
+  changed:
+    description: 'true when the rendered SVG differs from what was already committed.'
+    value: ${{ steps.render.outputs.changed }}
+
+runs:
+  using: composite
+  steps:
+    - name: Render
+      id: render
+      shell: bash
+      env:
+        RS_PATH: ${{ inputs.path }}
+        RS_OUTPUT: ${{ inputs.output }}
+        RS_THEME: ${{ inputs.theme }}
+        RS_WIDTH: ${{ inputs.width }}
+        RS_HEIGHT: ${{ inputs.height }}
+        RS_FPS: ${{ inputs.fps }}
+        RS_SECONDS: ${{ inputs.seconds }}
+        RS_CHROME: ${{ inputs.chrome }}
+        RS_ANIMATE: ${{ inputs.animate }}
+        RS_COMMITS: ${{ inputs.commits }}
+        RS_HISTORY: ${{ inputs.history }}
+        RS_JSON: ${{ inputs.json }}
+      run: |
+        set -euo pipefail
+
+        # Every `test && cmd` below is written as a full if-block on purpose:
+        # under `set -e` a bare `[ ... ] && cmd` exits the whole script the
+        # moment the test is false, which would abort this action whenever the
+        # output did not already exist.
+
+        format="${RS_OUTPUT##*.}"
+        case "$format" in
+          svg|gif|mp4|webm) ;;
+          *) echo "::error::output must end in .svg, .gif, .mp4 or .webm (got .$format)"; exit 1 ;;
+        esac
+
+        json_path="$RS_JSON"
+        if [ -z "$json_path" ]; then
+          json_path="$RUNNER_TEMP/reposense.json"
+        fi
+
+        before=""
+        if [ -f "$RS_OUTPUT" ]; then
+          before=$(git hash-object "$RS_OUTPUT")
+        fi
+
+        # The scan itself has no dependencies.
+        scan=("$RS_PATH" --out "$json_path")
+        if [ -n "$RS_COMMITS" ]; then
+          scan+=(--commits "$RS_COMMITS")
+        fi
+        if [ "$RS_HISTORY" = "false" ]; then
+          scan+=(--no-history)
+        fi
+
+        if [ "$format" = "svg" ]; then
+          scan+=(--svg "$RS_OUTPUT" --theme "$RS_THEME" --width "$RS_WIDTH")
+          if [ "$RS_ANIMATE" = "true" ]; then
+            scan+=(--animate)
+          fi
+          node "$GITHUB_ACTION_PATH/scripts/reposense.mjs" "${scan[@]}"
+        else
+          # Video needs a browser to render frames and ffmpeg to encode them.
+          # Both are installed inside the action's own directory so the caller's
+          # workspace and node_modules are left untouched.
+          scan+=(--json)
+          node "$GITHUB_ACTION_PATH/scripts/reposense.mjs" "${scan[@]}"
+
+          echo "::group::Installing the renderer"
+          npm ci --prefix "$GITHUB_ACTION_PATH" --no-audit --no-fund
+          "$GITHUB_ACTION_PATH/node_modules/.bin/playwright" install --with-deps chromium
+          echo "::endgroup::"
+
+          rec=(--data "$json_path" --out "$RS_OUTPUT"
+               --width "$RS_WIDTH" --height "$RS_HEIGHT" --fps "$RS_FPS")
+          if [ -n "$RS_SECONDS" ]; then
+            rec+=(--seconds "$RS_SECONDS")
+          fi
+          if [ "$RS_CHROME" = "true" ]; then
+            rec+=(--chrome)
+          fi
+          node "$GITHUB_ACTION_PATH/scripts/record.mjs" "${rec[@]}"
+        fi
+
+        after=$(git hash-object "$RS_OUTPUT")
+        if [ "$before" = "$after" ]; then
+          changed=false
+        else
+          changed=true
+        fi
+
+        files=$(RS_JSON_PATH="$json_path" node --input-type=module -e "
+          import fs from 'node:fs';
+          const p = process.env.RS_JSON_PATH;
+          console.log(fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')).files.length : 0);
+        ")
+
+        {
+          echo "svg=$RS_OUTPUT"
+          echo "output=$RS_OUTPUT"
+          echo "format=$format"
+          echo "files=$files"
+          echo "changed=$changed"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "Rendered $RS_OUTPUT ($format) from $files files (changed: $changed)"
+
+    - name: Commit
+      if: ${{ inputs.commit == 'true' && steps.render.outputs.changed == 'true' }}
+      shell: bash
+      env:
+        RS_OUTPUT: ${{ inputs.output }}
+        RS_MESSAGE: ${{ inputs.commit-message }}
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -- "$RS_OUTPUT"
+        # Nothing staged means another step already committed it; not an error.
+        if git diff --cached --quiet; then
+          echo "No staged change; nothing to commit."
+          exit 0
+        fi
+        git commit -m "$RS_MESSAGE"
+        git push

@@ -77,6 +77,7 @@ export class Arcology {
     const aHeat = new Float32Array(count);
     const aState = new Float32Array(count);
     const aAppear = new Float32Array(count);
+    const aFlash = new Float32Array(count);
     const aSeed = new Float32Array(count);
 
     const matrix = new THREE.Matrix4();
@@ -114,6 +115,7 @@ export class Arcology {
       aHeat[i] = f.heat || 0;
       aState[i] = STATE_NORMAL;
       aAppear[i] = 1;
+      aFlash[i] = 0;
       aSeed[i] = (i * 0.6180339887) % 1;
     }
 
@@ -122,10 +124,16 @@ export class Arcology {
     geo.setAttribute('aHeat', new THREE.InstancedBufferAttribute(aHeat, 1));
     geo.setAttribute('aState', new THREE.InstancedBufferAttribute(aState, 1));
     geo.setAttribute('aAppear', new THREE.InstancedBufferAttribute(aAppear, 1));
+    geo.setAttribute('aFlash', new THREE.InstancedBufferAttribute(aFlash, 1));
     geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(aSeed, 1));
 
     this.towers = mesh;
-    this.attrs = { aHeat: geo.attributes.aHeat, aState: geo.attributes.aState, aAppear: geo.attributes.aAppear };
+    this.attrs = {
+      aHeat: geo.attributes.aHeat,
+      aState: geo.attributes.aState,
+      aAppear: geo.attributes.aAppear,
+      aFlash: geo.attributes.aFlash,
+    };
     this.group.add(mesh);
   }
 
@@ -139,6 +147,7 @@ export class Arcology {
         attribute float aHeat;
         attribute float aState;
         attribute float aAppear;
+        attribute float aFlash;
         attribute float aSeed;
 
         uniform float uLift;
@@ -152,8 +161,10 @@ export class Arcology {
         varying vec3 vNormalW;
         varying vec3 vViewDir;
         varying float vAlpha;
+        varying float vFlash;
 
         void main() {
+          vFlash = aFlash;
           vColor = aColor;
           vHeat = aHeat;
           vState = aState;
@@ -187,6 +198,7 @@ export class Arcology {
         varying vec3 vNormalW;
         varying vec3 vViewDir;
         varying float vAlpha;
+        varying float vFlash;
 
         void main() {
           if (vAlpha < 0.5) discard;
@@ -199,15 +211,20 @@ export class Arcology {
 
           // Windows-in-a-tower feel: dark plinth fading to a lit crown.
           float crown = smoothstep(0.15, 1.0, vY);
-          vec3 base = mix(vColor * 0.10, vColor, 0.28 + 0.72 * crown);
-          vec3 col = base * (0.32 + 0.85 * lambert);
-          col += vColor * fres * 0.42;
-          col += vColor * crown * crown * 0.30;
+          vec3 base = mix(vColor * 0.14, vColor, 0.52 + 0.48 * crown);
+          vec3 col = base * (0.26 + 0.62 * lambert);
+          col += vColor * fres * 0.26;
+          col += vColor * crown * crown * 0.16;
 
           // Churn reads as a heat shimmer climbing the tower.
           float pulse = 0.6 + 0.4 * sin(uTime * 2.2 + vY * 6.0);
           col += vColor * vHeat * uHeatBoost * pulse * (0.5 + crown) * 1.1;
           col += vec3(1.0, 0.55, 0.25) * vHeat * uHeatBoost * crown * 0.40;
+
+          // A file appearing in the timeline flares white and settles. It reads
+          // as the moment of creation rather than as decoration: what lights up
+          // is exactly what that stretch of history added.
+          col += vec3(1.0, 0.95, 0.85) * vFlash * (1.4 + crown * 2.2);
 
           float alpha = 1.0;
           if (vState < 0.5) {          // dimmed by a search
@@ -566,8 +583,10 @@ export class Arcology {
   applyTime(t, { hasHistory, window: win = 60 * 60 * 24 * 45 }) {
     const appear = this.attrs.aAppear.array;
     const heat = this.attrs.aHeat.array;
+    const flash = this.attrs.aFlash.array;
     let visible = 0;
     let bytes = 0;
+    let appeared = 0;
 
     for (let i = 0; i < appear.length; i += 1) {
       const f = this.fileByInstance[i];
@@ -579,6 +598,15 @@ export class Arcology {
       } else if (hasHistory) {
         present = 1;
       }
+      // Flare on the transition into existence, then decay. Scrubbing backwards
+      // must not flare — going back in time is not a creation event.
+      if (present > 0.02 && appear[i] <= 0.02) {
+        flash[i] = 1;
+        appeared += 1;
+      } else if (flash[i] > 0) {
+        flash[i] = Math.max(0, flash[i] - 0.06);
+      }
+
       appear[i] = present;
       if (present > 0.02) {
         visible += 1;
@@ -594,19 +622,23 @@ export class Arcology {
     }
     this.attrs.aAppear.needsUpdate = true;
     this.attrs.aHeat.needsUpdate = true;
-    return { visible, bytes };
+    this.attrs.aFlash.needsUpdate = true;
+    return { visible, bytes, appeared };
   }
 
   /** Restores the static (non-playback) appearance. */
   resetTime() {
     const appear = this.attrs.aAppear.array;
     const heat = this.attrs.aHeat.array;
+    const flash = this.attrs.aFlash.array;
     for (let i = 0; i < appear.length; i += 1) {
       appear[i] = 1;
+      flash[i] = 0;
       heat[i] = this.fileByInstance[i].heat || 0;
     }
     this.attrs.aAppear.needsUpdate = true;
     this.attrs.aHeat.needsUpdate = true;
+    this.attrs.aFlash.needsUpdate = true;
   }
 
   update(dt, time, camera) {

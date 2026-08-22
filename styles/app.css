@@ -397,8 +397,39 @@ code, kbd, .mono { font-family: var(--mono); }
 .mode:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .timeline { padding: 5px 14px 5px 5px; gap: 10px; }
-#time-range { width: clamp(120px, 22vw, 260px); accent-color: var(--accent); }
-.time-read { display: grid; line-height: 1.25; min-width: 88px; }
+
+/* The activity strip. One measure — commit volume over time — with the played
+   span lit and the rest recessive. Progress is emphasis within one hue, not a
+   second series. */
+.time-track {
+  position: relative;
+  width: clamp(140px, 26vw, 320px);
+  height: 30px;
+  border-radius: 6px;
+  background: rgba(120, 160, 220, 0.06);
+  overflow: visible;
+}
+.time-spark { display: block; width: 100%; height: 100%; }
+.rs-spark-base rect { fill: rgba(134, 151, 176, 0.38); }
+.rs-spark-on rect { fill: var(--accent); }
+
+.time-playhead {
+  position: absolute; top: -2px; bottom: -2px; width: 1.5px; margin-left: -0.75px;
+  background: #fff; border-radius: 2px; pointer-events: none;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.75);
+}
+.time-hover {
+  position: absolute; bottom: calc(100% + 8px); transform: translateX(-50%);
+  padding: 4px 8px; border-radius: 6px; white-space: nowrap; pointer-events: none;
+  background: rgba(4, 8, 18, 0.95); border: 1px solid var(--border-bright);
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+}
+#time-range {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; opacity: 0; cursor: ew-resize;
+}
+#time-range:focus-visible { opacity: 0.001; outline: 2px solid var(--accent); outline-offset: 3px; }
+.time-read { display: grid; line-height: 1.25; min-width: 128px; }
 .time-read strong { font-family: var(--mono); font-size: 12px; }
 .time-read span { font-size: 10px; color: var(--text-faint); }
 
@@ -418,7 +449,11 @@ code, kbd, .mono { font-family: var(--mono); }
 /* captions */
 .caption {
   position: absolute; left: 50%; bottom: 20%; transform: translateX(-50%);
-  text-align: center; pointer-events: none; z-index: 3;
+  text-align: center; pointer-events: none; z-index: 6;
+  /* A soft scrim so the caption stays legible over the structure and its
+     labels, which float wherever the geometry puts them. */
+  padding: 26px 64px;
+  background: radial-gradient(60% 120% at 50% 50%, rgba(2, 5, 12, 0.82), rgba(2, 5, 12, 0) 72%);
   animation: capIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes capIn { from { opacity: 0; transform: translate(-50%, 14px); letter-spacing: 0.2em; } }
@@ -435,6 +470,17 @@ code, kbd, .mono { font-family: var(--mono); }
 .viewer.is-cinema .panel,
 .viewer.is-cinema .dock { opacity: 0; pointer-events: none; transition: opacity 0.5s; }
 .viewer.is-cinema .scanline { opacity: 0.09; }
+
+/* While recording, every frame is drawn at an explicit timestamp. Any CSS
+   transition or animation is driven by wall-clock time instead, so it would
+   bleed a different amount into each frame — the HUD's 0.5s fade-out was
+   landing half-drawn in the opening second of every recording. */
+.rs-recording *,
+.rs-recording *::before,
+.rs-recording *::after {
+  transition: none !important;
+  animation: none !important;
+}
 
 /* tooltip */
 .tooltip {
