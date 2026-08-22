@@ -59,7 +59,7 @@ export class Stage {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     // strength / radius / threshold — the threshold is deliberately high so only
     // emissive crowns and rim strips bloom, not every lit surface.
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.44, 0.74, 0.58);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.36, 0.72, 0.74);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
 

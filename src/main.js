@@ -15,6 +15,7 @@ import { Constellation } from './scene/constellation.js';
 import { Cinema, Recorder, TOUR_DURATION } from './scene/cinema.js';
 import { githubUrlFor } from './links.js';
 import { Hud } from './ui/hud.js';
+import { Timeline } from './ui/timeline.js';
 
 const $ = (id) => document.getElementById(id);
 const REVEAL_SECONDS = 2.6;
@@ -26,6 +27,7 @@ const app = {
   constellation: null,
   cinema: null,
   hud: new Hud(),
+  timeline: null,
   model: null,
   layout: null,
   mode: 'arcology',
@@ -348,7 +350,16 @@ async function present(payload) {
   app.hud.showHits([], '');
 
   // Chronology needs at least one timestamp to scrub against.
+  if (!app.timeline) {
+    app.timeline = new Timeline({
+      track: $('time-track'),
+      svg: $('time-spark'),
+      playhead: $('time-playhead'),
+      readout: $('time-hover'),
+    });
+  }
   const canTime = app.model.stats.lastTouched > 0;
+  if (canTime) app.timeline.setData(app.model, timeRange());
   document.querySelector('[data-mode="chronology"]').disabled = !canTime;
   document.querySelector('[data-mode="constellation"]').disabled = app.constellation.empty;
 
@@ -658,6 +669,8 @@ function setTime(t01) {
   const t = start + (end - start) * app.timeT;
   const { visible, bytes } = app.arcology.applyTime(t, { hasHistory: app.model.stats.hasHistory });
   $('time-range').value = String(Math.round(app.timeT * 1000));
+
+  app.timeline?.setPosition(app.timeT);
 
   const detail = app.model.stats.hasHistory
     ? `${visible.toLocaleString()} files · ${formatBytes(bytes)}`
