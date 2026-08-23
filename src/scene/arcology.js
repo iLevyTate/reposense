@@ -207,7 +207,11 @@ export class Arcology {
           // lights would flatten the silhouettes the bloom pass depends on.
           vec3 keyDir = normalize(vec3(0.45, 0.8, 0.35));
           float lambert = max(dot(normalize(vNormalW), keyDir), 0.0);
-          float fres = pow(1.0 - max(dot(normalize(vNormalW), normalize(vViewDir)), 0.0), 2.4);
+          // The base is clamped at zero because dot() of two normalized
+          // vectors can exceed 1.0 by a float ulp on real GPUs, and
+          // pow(negative, 2.4) is NaN — which the bloom blur then smears
+          // across the entire frame as white.
+          float fres = pow(max(1.0 - dot(normalize(vNormalW), normalize(vViewDir)), 0.0), 2.4);
 
           // Windows-in-a-tower feel: dark plinth fading to a lit crown.
           float crown = smoothstep(0.15, 1.0, vY);
@@ -438,7 +442,8 @@ export class Arcology {
           varying vec3 vV;
           uniform float uTime;
           void main() {
-            float fres = pow(1.0 - max(dot(vN, vV), 0.0), 1.6);
+            // max() before pow, for the same NaN reason as the tower fresnel.
+            float fres = pow(max(1.0 - dot(vN, vV), 0.0), 1.6);
             vec3 col = mix(vec3(0.25, 0.85, 1.0), vec3(0.85, 0.45, 1.0), fres);
             float pulse = 0.75 + 0.25 * sin(uTime * 1.8);
             gl_FragColor = vec4(col * (0.55 + fres * 2.2) * pulse, 1.0);

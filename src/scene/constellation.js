@@ -97,7 +97,10 @@ export class Constellation {
             uniform vec3 uColor; uniform float uTime; uniform float uSeed;
             varying vec3 vN; varying vec3 vV;
             void main() {
-              float fres = pow(1.0 - abs(dot(vN, vV)), 2.6);
+              // max() before pow: abs(dot) can exceed 1.0 by a float ulp on
+              // real GPUs, and pow of a negative base is NaN that bloom then
+              // smears across the whole frame.
+              float fres = pow(max(1.0 - abs(dot(vN, vV)), 0.0), 2.6);
               float pulse = 0.7 + 0.3 * sin(uTime * 1.6 + uSeed);
               gl_FragColor = vec4(uColor * fres * pulse * 2.2, fres * 0.75);
             }`,
