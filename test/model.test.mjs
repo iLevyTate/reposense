@@ -13,7 +13,7 @@ test('buildModel derives a hierarchy from flat paths', () => {
   const m = buildModel({ files });
   assert.equal(m.stats.fileCount, 3);
   assert.equal(m.stats.totalSize, 5020);
-  assert.equal(m.stats.dirCount, 2); // src, src/deep — the synthetic root does not count
+  assert.equal(m.stats.dirCount, 2); // src, src/deep; the synthetic root does not count
   assert.deepEqual(m.root.children.map((c) => `${c.name}:${c.type}`), ['src:dir', 'README.md:file']);
 });
 

@@ -60,9 +60,10 @@ export function parseRepoInput(input) {
 }
 
 async function request(path, { signal, token = getToken(), accept = 'application/vnd.github+json' } = {}) {
-  // Only `Accept` is set for anonymous calls. Accept is CORS-safelisted, so the
-  // request stays a "simple" one and the browser skips the preflight entirely —
-  // halving the round trips and removing a failure mode behind strict proxies.
+  // Only `Accept` is set for anonymous calls. Accept is CORS-safelisted, so
+  // the request stays a "simple" one and the browser skips the preflight
+  // entirely. That halves the round trips and removes a failure mode behind
+  // strict proxies.
   // A token adds Authorization, which forces a preflight; GitHub answers it.
   const headers = { Accept: accept };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -97,7 +98,7 @@ async function request(path, { signal, token = getToken(), accept = 'application
     );
   }
   if (res.status === 401) throw new GitHubError('Token rejected by GitHub. It may be expired.', { status: 401 });
-  if (res.status === 409) throw new GitHubError('This repository is empty — nothing to visualize yet.', { status: 409 });
+  if (res.status === 409) throw new GitHubError('This repository is empty. There is nothing to visualize yet.', { status: 409 });
 
   let detail = '';
   try {
@@ -203,7 +204,8 @@ function normalizeActivity(weeks) {
  * Open recent commits to recover per-file churn and last-touched timestamps.
  *
  * The commit list endpoint does not include file lists, so this costs one
- * request per commit. It is opt-in for exactly that reason.
+ * request per commit. That cost is why main.js clamps the depth for
+ * anonymous callers instead of replaying everything.
  */
 async function applyDeepScan(payload, slug, limit, { signal, onProgress }) {
   onProgress({ phase: 'Listing commits', progress: 0.45 });

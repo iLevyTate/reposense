@@ -1,5 +1,5 @@
 /**
- * RepoSense — application entry point.
+ * RepoSense application entry point.
  *
  * Owns routing, loading, and every interaction that crosses the boundary
  * between the DOM and the 3D scene.
@@ -22,8 +22,8 @@ const REVEAL_SECONDS = 2.6;
 
 /**
  * The deep history scan costs one API request per commit, and anonymous
- * callers get 60 requests/hour in total. History is on by default — the
- * Chronology is the point of the product — so without a token the replay is
+ * callers get 60 requests/hour in total. History is on by default, because
+ * the Chronology is the point of the product, so without a token the replay is
  * clamped low enough to leave headroom for the base requests and a second
  * load. A token raises the ceiling to 5,000/hour and lifts the clamp.
  */
@@ -273,7 +273,7 @@ async function loadFromRoute() {
   await withLoading(async (signal) => {
     const payload = await fetchRepo(repo, { signal, deepScan, onProgress: (p) => app.hud.setProgress(p) });
     // Surface the clamp in the composition notes rather than silently
-    // delivering less history than the slider asked for — but only when the
+    // delivering less history than the slider asked for, but only when the
     // clamp actually bit. A repository with fewer commits than the clamp ran
     // out of history, not out of budget.
     if (deepScan < wanted && payload.scan?.commits >= deepScan) payload.scan.clamped = true;
@@ -319,7 +319,7 @@ async function loadFile(file) {
       throw new Error('That file is not valid JSON.');
     }
     if (!payload || !Array.isArray(payload.files)) {
-      throw new Error('That JSON is not a RepoSense export — it has no "files" array.');
+      throw new Error('That JSON is not a RepoSense export. It has no "files" array.');
     }
     return payload;
   });
@@ -461,7 +461,7 @@ function updateShareUrl(payload) {
     const want = `#/${r.owner}/${r.name}`;
     if (location.hash !== want) history.replaceState(null, '', want);
   }
-  document.title = r?.owner ? `${r.owner}/${r.name} — RepoSense` : 'RepoSense';
+  document.title = r?.owner ? `${r.owner}/${r.name} · RepoSense` : 'RepoSense';
 }
 
 function teardownScene() {
@@ -482,7 +482,7 @@ function showLaunch() {
   $('launch').hidden = false;
   app.startLaunchBackdrop?.();
   app.hud.showLoading(false);
-  document.title = 'RepoSense — Visualize Your Repo Cinematically';
+  document.title = 'RepoSense: Visualize Your Repo Cinematically';
   refreshRateHint();
 }
 
@@ -605,7 +605,7 @@ function wireViewer() {
 
   // Rotating a phone flips the aspect ratio, and the framing correction that
   // keeps a wide structure on screen depends on it. Re-frame on an actual
-  // orientation change only — never on an ordinary desktop window resize,
+  // orientation change only, never on an ordinary desktop window resize,
   // which would yank the camera out from under the viewer.
   let wasPortrait = innerWidth < innerHeight;
   let reframeTimer;
@@ -682,7 +682,7 @@ function modeAvailable(mode) {
  * Switches mode for a tour shot.
  *
  * Falls back to the Arcology when a shot's mode has no data behind it, and
- * stays silent about it — the HUD is hidden during a tour, so the toast
+ * stays silent about it: the HUD is hidden during a tour, so the toast
  * setMode() would raise has nowhere to go.
  */
 function applyTourMode(mode) {
@@ -764,7 +764,7 @@ function setTime(t01) {
   // The creation flare should last a fixed slice of *wall-clock* playback, so
   // its length in history-seconds scales with how much history the sweep
   // covers. Passing it as a window keeps the flare a pure function of the
-  // timestamp — identical live, scrubbed, or recorded offline at any fps.
+  // timestamp: identical live, scrubbed, or recorded offline at any fps.
   const flashWindow = ((end - start) / TIMELINE_SWEEP_SECONDS) * FLASH_WALL_SECONDS;
   const { visible, bytes } = app.arcology.applyTime(t, { hasHistory: app.model.stats.hasHistory, flashWindow });
   $('time-range').value = String(Math.round(app.timeT * 1000));
@@ -773,7 +773,7 @@ function setTime(t01) {
 
   const detail = app.model.stats.hasHistory
     ? `${visible.toLocaleString()} files · ${formatBytes(bytes)}`
-    : 'heat only — no creation dates in this dataset';
+    : 'heat only; no creation dates in this dataset';
   app.hud.showTime(t, detail);
 }
 
@@ -882,7 +882,7 @@ async function toggleRecording() {
 
   btn.classList.add('is-active');
   btn.querySelector('span:last-child').textContent = 'Stop';
-  app.hud.toast(`Recording — the tour runs ${Math.round(TOUR_DURATION)}s`);
+  app.hud.toast(`Recording. The tour runs ${Math.round(TOUR_DURATION)}s.`);
   if (!app.cinema.playing) startTour();
 }
 
@@ -903,7 +903,7 @@ function tick(dt, time) {
   // Driven by wall-clock elapsed time, not by accumulating `dt`. `dt` is capped
   // at 50ms so a backgrounded tab cannot jump the animation, but that cap also
   // means a slow frame rate advances the reveal per *frame* rather than per
-  // second — on a 5120x1440 display at a few frames per second the structure
+  // second; on a 5120x1440 display at a few frames per second the structure
   // stayed invisible for close to a minute.
   if (app.revealStart !== null) {
     const p = Math.min(1, (time - app.revealStart) / REVEAL_SECONDS);

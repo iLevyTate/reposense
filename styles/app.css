@@ -425,7 +425,7 @@ code, kbd, .mono { font-family: var(--mono); }
 }
 #time-play:hover { background: rgba(102, 224, 255, 0.22); color: var(--accent); }
 
-/* The activity strip. One measure — commit volume over time — with the played
+/* The activity strip. One measure, commit volume over time, with the played
    span lit and the rest recessive. Progress is emphasis within one hue, not a
    second series. */
 .time-track {
@@ -459,8 +459,8 @@ code, kbd, .mono { font-family: var(--mono); }
 .time-read { display: grid; line-height: 1.25; min-width: 128px; }
 .time-read strong { font-family: var(--mono); font-size: 12px; }
 .time-read span { font-size: 10px; color: var(--text-faint); }
-/* What the bars measure and how much history is behind them — a chart whose
-   units are guessable is not explained. */
+/* What the bars measure and how much history is behind them. A chart whose
+   units have to be guessed is not explained. */
 .time-measure { letter-spacing: 0.02em; opacity: 0.85; }
 
 .tool {
@@ -503,7 +503,7 @@ code, kbd, .mono { font-family: var(--mono); }
 
 /* While recording, every frame is drawn at an explicit timestamp. Any CSS
    transition or animation is driven by wall-clock time instead, so it would
-   bleed a different amount into each frame — the HUD's 0.5s fade-out was
+   bleed a different amount into each frame; the HUD's 0.5s fade-out was
    landing half-drawn in the opening second of every recording. */
 .rs-recording *,
 .rs-recording *::before,

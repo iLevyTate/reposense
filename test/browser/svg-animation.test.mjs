@@ -70,7 +70,7 @@ test('the static SVG does not move', async () => {
 
 test('the animation settles on the fully built structure', async () => {
   // Whatever the motion does, a reader arriving mid-cycle must mostly see the
-  // finished thing — and the settled frame must match the static render.
+  // finished thing, and the settled frame must match the static render.
   const settled = (await framesOf(renderSvg(payload, { animate: true }), [5000]))[0];
   const stat = (await framesOf(renderSvg(payload, { animate: false }), [400]))[0];
 

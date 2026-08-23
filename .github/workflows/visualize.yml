@@ -16,7 +16,7 @@ jobs:
   render:
     # The commit this job makes lands on main and re-triggers the workflow. The
     # second run renders identical files, finds nothing staged, commits nothing
-    # and stops — so this settles rather than looping.
+    # and stops, so this settles rather than looping.
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:

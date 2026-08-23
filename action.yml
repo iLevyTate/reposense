@@ -14,14 +14,15 @@ inputs:
   output:
     description: >-
       Where to write the result, relative to the workspace. The extension picks
-      the format: .svg, .gif, .mp4, .webm or .webp (animated — the README-embeddable one).
+      the format: .svg, .gif, .mp4, .webm or .webp. The webp is animated and
+      small enough to embed in a README.
     required: false
     default: reposense.svg
   seconds:
     description: >-
       Video length. Defaults to the full cinematic tour (~48s). Only used for
-      gif/mp4/webm/webp. A GIF of more than a few seconds gets large fast —
-      prefer webp for a README embed and mp4/webm for anything else long.
+      gif/mp4/webm/webp. A GIF of more than a few seconds gets large fast.
+      Prefer webp for a README embed and mp4/webm for anything else long.
     required: false
     default: ''
   fps:
@@ -37,7 +38,7 @@ inputs:
     required: false
     default: 'false'
   theme:
-    description: 'dark or light. Render twice to serve both — see the README.'
+    description: 'dark or light. Render twice to serve both; see the README.'
     required: false
     default: dark
   width:
@@ -83,7 +84,7 @@ outputs:
     description: Path to the rendered file.
     value: ${{ steps.render.outputs.output }}
   format:
-    description: 'svg, gif, mp4, webm or webp — taken from the output extension.'
+    description: 'svg, gif, mp4, webm or webp, taken from the output extension.'
     value: ${{ steps.render.outputs.format }}
   svg:
     description: Deprecated alias for `output`.

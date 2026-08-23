@@ -4,9 +4,9 @@
 
 **Visualize your repo cinematically.**
 
-Files become towers. Folders become terraces. A repository assembles itself into
-a structure you can fly through — sized by bytes, coloured by language, lit by
-how recently it changed.
+Files become towers. Folders become terraces. A repository assembles itself
+into a structure you can fly through: sized by bytes, coloured by language,
+lit by how recently it changed.
 
 [**Open the visualizer →**](https://ilevytate.github.io/reposense/)
 
@@ -14,7 +14,7 @@ how recently it changed.
   <img alt="The Arcology view of RepoSense's own repository: concentric terraces stepping outward and upward, with a glowing tower on each one for every file" src="public/shots/arcology.png" width="100%">
 </a>
 
-<sub>RepoSense rendering itself — clicking any shot opens this repository in the live explorer.</sub>
+<sub>RepoSense rendering itself. Clicking any shot opens this repository in the live explorer.</sub>
 
 <table>
   <tr>
@@ -22,12 +22,12 @@ how recently it changed.
     <td width="50%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Constellation view: contributors orbiting the districts they built" src="public/shots/constellation.png"></a></td>
   </tr>
   <tr align="center">
-    <td><sub><b>Chronology</b> — scrub the git history; files flare as they are created</sub></td>
-    <td><sub><b>Constellation</b> — who built which part of it</sub></td>
+    <td><sub><b>Chronology</b>: scrub the git history and watch files flare as they are created</sub></td>
+    <td><sub><b>Constellation</b>: who built which part of it</sub></td>
   </tr>
 </table>
 
-<sub><b>Arcology</b> above — rings are depth, height is size, colour is language.</sub>
+<sub><b>Arcology</b> above. Rings are depth, height is size, colour is language.</sub>
 
 </div>
 
@@ -46,7 +46,7 @@ how recently it changed.
 ## 1. The website
 
 Go to **[ilevytate.github.io/reposense](https://ilevytate.github.io/reposense/)**
-and type a repository. It builds in a few seconds. There is no backend — the
+and type a repository. It builds in a few seconds. There is no backend; the
 page talks to the GitHub API from your browser.
 
 Anything recognisable works in the box:
@@ -57,17 +57,17 @@ https://github.com/pallets/flask
 git@github.com:charmbracelet/bubbletea.git
 ```
 
-Every view is linkable: `…/reposense/#/pallets/flask` loads that repo directly.
+Every view is linkable. `…/reposense/#/pallets/flask` loads that repo directly.
 
-> **On rate limits.** Anonymous GitHub API access allows 60 requests an hour per
-> IP. The structure costs about five requests; the history replay that powers
-> Chronology costs one per commit, so anonymously it stops at the newest 40
-> commits and says so. Add a
-> [personal access token](https://github.com/settings/tokens) under **Options**
-> for 5,000 an hour, a replay of up to 1,000 commits, and access to private
-> repositories. It is stored in your
-> browser and sent only to `api.github.com` — there is no RepoSense server for it
-> to reach.
+> **On rate limits.** Anonymous GitHub API access allows 60 requests an hour
+> per IP. The structure costs about five requests, and the history replay that
+> powers Chronology costs one per commit, so an anonymous session stops at the
+> newest 40 commits and says so. A
+> [personal access token](https://github.com/settings/tokens), added under
+> **Options**, raises the ceiling to 5,000 an hour, extends the replay to
+> 1,000 commits, and opens private repositories. The token lives in your
+> browser's local storage and is sent to `api.github.com` and nowhere else.
+> There is no RepoSense server for it to reach.
 
 ## 2. The CLI
 
@@ -75,9 +75,9 @@ Every view is linkable: `…/reposense/#/pallets/flask` loads that repo directly
 npx github:iLevyTate/reposense
 ```
 
-Run it inside any git repository. It scans the working tree, replays the commit
-log, writes `reposense.json`, and opens the viewer pointed at it. Node 18+, no
-dependencies, nothing leaves your machine.
+Run it inside any git repository. It scans the working tree, replays the
+commit log, writes `reposense.json`, and opens the viewer pointed at it.
+Node 18 or newer. No dependencies. Nothing leaves your machine.
 
 It exists because it is strictly better wherever it applies:
 
@@ -97,8 +97,8 @@ reposense --no-history           # skip the git log pass (fast on huge repos)
 reposense -c 500                 # only the newest 500 commits
 ```
 
-The `reposense.json` it writes can be **dropped straight onto the website** —
-drag it anywhere on the start screen. That is the path for private code: the
+The `reposense.json` it writes can be dropped straight onto the website: drag
+it anywhere on the start screen. That is the path for private code. The
 visualization runs in your browser and the data never travels.
 
 ## 3. The Action
@@ -127,7 +127,7 @@ jobs:
           commit: 'true'
 ```
 
-There is nothing to install and no browser involved — the renderer is the same
+There is nothing to install and no browser involved. The renderer is the same
 layout engine the 3D viewer uses, projected isometrically and written straight
 out as vector. A repository of a few thousand files lands in about 25 KB.
 
@@ -142,24 +142,25 @@ out as vector. A repository of a few thousand files lands in about 25 KB.
 | `animate` | `false` | Build the structure in on a loop (SVG) |
 | `height` | `720` | Frame height, video only |
 | `fps` | `30` | Frames per second, video only |
-| `seconds` | *(full tour)* | Video length — the whole tour is about 48s |
+| `seconds` | *(full tour)* | Video length; the whole tour runs about 48s |
 | `chrome` | `false` | Keep the HUD visible in video |
 | `commits` | *(all)* | Cap history at the newest N commits |
 | `history` | `true` | `false` skips the git log pass entirely |
-| `json` | — | Also write the raw `reposense.json` here |
+| `json` | *(none)* | Also write the raw `reposense.json` here |
 | `commit` | `false` | Commit the result back to the branch |
 | `commit-message` | *(see `action.yml`)* | Message used when committing |
 
-Outputs: `output` (path), `format`, `files` (count), and `changed` (`true` when
-the render differs from what was already committed — useful for gating later
-steps). `svg` remains as an alias for `output`.
+Outputs: `output` (path), `format`, `files` (count), and `changed`, which is
+`true` when the render differs from what was already committed. Gate later
+steps on `changed` to skip work when nothing moved. `svg` remains as an alias
+for `output`.
 
 ### Video and GIF
 
-The `output` extension picks the format. `.svg` needs nothing installed; `.gif`,
-`.mp4`, `.webm` and `.webp` render the full cinematic tour through a headless browser and
-encode it with ffmpeg, both of which the action installs into its own directory
-when asked for.
+The `output` extension picks the format. `.svg` needs nothing installed.
+`.gif`, `.mp4`, `.webm` and `.webp` render the full cinematic tour through a
+headless browser and encode it with ffmpeg, both of which the action installs
+into its own directory when asked for.
 
 ```yaml
       - uses: iLevyTate/reposense@main
@@ -169,8 +170,8 @@ when asked for.
           fps: '30'
 ```
 
-Frames are requested by timestamp rather than captured in real time, so a runner
-falling back to software rasterisation still produces smooth output — it simply
+Frames are requested by timestamp rather than captured in real time. A runner
+that falls back to software rasterisation still produces smooth output; it
 takes longer to render, never choppier.
 
 **Which format to embed.** Measured on this repository:
@@ -181,15 +182,15 @@ takes longer to render, never choppier.
 | GIF | 1.5 MB | 3.6 MB |
 | MP4 | 214 KB | 422 KB |
 
-For a README, prefer the **animated SVG**: it is two orders of magnitude smaller
+For a README, prefer the animated SVG. It is two orders of magnitude smaller
 than the GIF, stays sharp at any width, and renders inline from a repository
 path. Reach for GIF only if you need a raster the SVG cannot give you.
 
-MP4 and WebM are the best-looking and smallest of the three, but a repository
-path to one does **not** play inline in a README — GitHub only renders a video
-player for files uploaded through its own comment or release attachments. Use
-them for release notes, issues, and social posts, and link to them from the
-README.
+MP4 and WebM are the best looking and the smallest of the three, but a
+repository path to one does **not** play inline in a README. GitHub only
+renders a video player for files uploaded through its own comment or release
+attachments. Use them for release notes, issues, and social posts, and link
+to them from the README.
 
 ### Put it in your README
 
@@ -217,67 +218,70 @@ To serve both colour schemes, render twice and let the browser pick:
 </a>
 ```
 
-That is exactly what the image at the top of this file does — see
+This repository does exactly that. See
 [`.github/workflows/visualize.yml`](.github/workflows/visualize.yml), which
-renders both variants and commits them. The workflow skips its own bot commits,
-so it settles after one pass instead of looping.
+renders both variants and commits them. The workflow skips its own bot
+commits, so it settles after one pass instead of looping.
 
 #### It moves, without being a GIF
 
 With `animate: 'true'` the structure builds itself in on a loop. The motion is
-CSS *inside* the SVG, which matters: GitHub strips `<script>` from embedded SVG
-but still runs stylesheets when the file is rendered as an image. So it animates
-in a README where anything script-driven would sit there dead — at about 7% more
-bytes than the still version, rather than the megabytes a GIF of the same thing
-would cost, and it stays sharp at any width.
+CSS inside the SVG, and that detail carries the whole feature: GitHub strips
+`<script>` from embedded SVG but still runs stylesheets when the file renders
+as an image. So it animates in a README where anything script-driven would sit
+there dead. The cost is about 7% more bytes than the still version, against
+the megabytes a GIF of the same motion would weigh.
 
 The cycle spends most of its length fully built, so a reader arriving at any
-moment sees the finished structure rather than a half-drawn one. Anything that
-ignores the CSS — and anyone who has asked their system for reduced motion —
-gets the still frame.
+moment sees the finished structure rather than a half-drawn one. Any renderer
+that ignores the CSS shows the still frame. So does any reader who has asked
+their system for reduced motion.
 
-If you want a video instead, there are two ways: the Action renders one in CI
-(see [Video and GIF](#video-and-gif)), or the web app records one live — press
+If you want a video instead, there are two ways. The Action renders one in CI
+(see [Video and GIF](#video-and-gif)). Or the web app records one live: press
 **R** and it writes a WebM of the tour, including your own camera moves.
 
-Prefer not to commit an image? Point the Action at a temporary path and upload it
-as an artifact instead; every render is deterministic, so the same tree always
-produces the same file.
+Prefer not to commit an image? Point the Action at a temporary path and upload
+the result as an artifact. Every render is deterministic, so the same tree
+always produces the same file.
 
 ---
 
 ## Reading the structure
 
-The layout is a **radial icicle**: depth in the tree maps to a concentric ring
-*and* to altitude, so a repository reads as a stepped ziggurat rather than a flat
-sunburst.
+The layout is a **radial icicle**. Depth in the tree maps to a concentric
+ring *and* to altitude, so a repository reads as a stepped ziggurat rather
+than a flat sunburst.
 
 | You see | It means |
 | --- | --- |
 | **Ring** | How deep a file sits in the tree |
-| **Terrace** | A directory — everything it contains stands on it |
+| **Terrace** | A directory; everything it contains stands on it |
 | **Tower** | A file; height is its size, on a log scale |
 | **Colour** | Language |
-| **Glow** | Churn — lines added and deleted, where history is available |
+| **Glow** | Churn: lines added and deleted, where history is available |
 | **Bridge** | The ramp from a folder's slice up to its own terrace |
 | **Core** | The repository root, at the centre of it all |
 
-A directory's slice of the disc is its share of the codebase. Sibling order is
-deterministic, so the same repository always produces the same structure — and
-the same SVG, byte for byte.
+A directory's slice of the disc is its share of the codebase. Sibling order
+is deterministic, so the same repository always produces the same structure,
+and the same SVG, byte for byte.
 
 ### Three views
 
-- **Arcology** — the structure itself. Hover a tower to inspect it, click to keep
-  it selected, shift-click to open it on GitHub, search to isolate a subtree.
-- **Chronology** — scrub the repository's history. Where creation dates are
-  known, towers rise as history reaches them; otherwise the timeline drives churn
-  heat only, and the panel says so rather than pretending.
-- **Constellation** — contributors in orbit, sized by commits, with light-arcs to
-  the directories they actually touched.
+**Arcology** is the structure itself. Hover a tower to inspect it, click to
+keep it selected, shift-click to open it on GitHub, search to isolate a
+subtree.
 
-Press **T** for a scripted camera tour through all three, **R** to record it to a
-WebM file.
+**Chronology** scrubs the repository's history. Where creation dates are
+known, towers rise as history reaches them. Otherwise the timeline drives
+churn heat only, and the panel says so rather than pretending.
+
+**Constellation** puts contributors in orbit, sized by commits, with light
+arcs to the directories they actually touched.
+
+Press **T** for a scripted camera tour through all three. Press **R** to
+record it to a WebM file.
 
 ### Keyboard
 
@@ -295,30 +299,30 @@ WebM file.
 
 ### Displays
 
-Framing adapts to the viewport. three.js fixes the *vertical* field of view and
-this structure is far wider than it is tall, so without a correction a portrait
+Framing adapts to the viewport. three.js fixes the *vertical* field of view,
+and this structure is far wider than it is tall, so an uncorrected portrait
 phone crops the outer rings off the sides while an ultrawide strands the
-structure in an empty frame. RepoSense corrects both ways — pulling back on
-narrow screens, pushing in slightly on wide ones — and re-frames when a phone
+structure in an empty frame. RepoSense corrects both ways: it pulls back on
+narrow screens, pushes in slightly on wide ones, and re-frames when a phone
 rotates. Verified from 390×844 to 5120×1440.
 
 ---
 
 ## Honesty about the data
 
-A visualization that quietly invents data is worse than none, so:
+A visualization that quietly invents data is worse than none. The rules here:
 
-- **Sizes and structure** are always real, straight from the git tree.
-- **Churn, authorship and creation dates** need history. The commit-list API
-  does not return file lists, so the website's **deep scan** — on by default —
-  opens recent commits one request each to recover them, and the scrubber
-  labels exactly how many commits it covers. The CLI and the Action replay the
+- Sizes and structure are always real, straight from the git tree.
+- Churn, authorship and creation dates need history. The commit-list API does
+  not return file lists, so the website's deep scan (on by default) opens
+  recent commits one request each to recover them, and the scrubber labels
+  exactly how many commits it covers. The CLI and the Action replay the
   entire git log by default.
-- When history is missing, Chronology is **disabled** and the panel explains why,
+- When history is missing, Chronology is disabled and the panel explains why,
   rather than animating something meaningless.
-- On very large repositories the smallest files fold into `…N more files` towers
-  to protect the frame rate. The totals still describe every file, and the panel
-  reports how many were folded.
+- On very large repositories the smallest files fold into `…N more files`
+  towers to protect the frame rate. The totals still describe every file, and
+  the panel reports how many were folded.
 - If GitHub truncates the tree for an enormous repository, the panel says so.
 
 ---
@@ -351,29 +355,34 @@ action.yml            the GitHub Action
 vendor/three/         three.js, vendored so there is no CDN dependency
 ```
 
-A few decisions worth knowing if you dig in:
+A few decisions worth knowing if you dig in.
 
-- **All towers are one `InstancedMesh`.** Colour, churn, search state and
-  timeline presence are per-instance attributes, so 14,000 files cost one draw
-  call and scrubbing history costs one buffer upload.
-- **Tower altitude lives in the instance matrix, not the shader.** Terraces
-  offset altitude in their vertex shader for a free reveal animation, but the
-  raycaster reads matrices — towers that floated in the shader would be picked at
-  the wrong height.
-- **Every material is a custom unlit shader**, authored deliberately bright so the
-  bloom threshold turns crowns and rim strips into light sources. The scene
-  therefore contains no lights and no fog at all.
-- **Camera framing follows the weighted centroid**, not the origin. A radial
-  layout is only centred when the tree is balanced, and real repositories have a
-  vendored dependency stretching one thin arm into the distance.
-- **The layout engine is pure maths** — no DOM, no three.js. That is what lets the
-  Action reuse it to render SVG in a runner with no browser.
-- **The recorder asks for frames by timestamp**, it does not capture in real
-  time. Every animation is a function of the tour clock, so a frame is
-  reproducible; a slow machine takes longer but never drops or smears one. The
-  single-frame render path deliberately skips `controls.update()`, because
-  damping is stateful and would make the same timestamp depend on what was
-  rendered before it.
+All towers are one `InstancedMesh`. Colour, churn, search state and timeline
+presence are per-instance attributes, so 14,000 files cost one draw call and
+scrubbing history costs one buffer upload.
+
+Tower altitude lives in the instance matrix, not the shader. Terraces offset
+altitude in their vertex shader, which buys the reveal animation for free,
+but the raycaster reads matrices. A tower that floated in the shader would be
+picked at the wrong height.
+
+Every material is a custom shader, authored deliberately bright so the bloom
+threshold turns crowns and rim strips into light sources. The scene contains
+no lights.
+
+Camera framing follows the weighted centroid, not the origin. A radial layout
+is only centred when the tree is balanced, and real repositories are not: one
+vendored dependency stretches a thin arm into the distance.
+
+The layout engine is pure maths, with no DOM and no three.js in it. That is
+what lets the Action reuse it to render SVG in a runner with no browser.
+
+The recorder asks for frames by timestamp. It does not capture in real time.
+Every animation is a function of the tour clock, so any frame is
+reproducible; a slow machine takes longer but never drops or smears one. The
+single-frame render path deliberately skips `controls.update()`, because
+damping is stateful and would make the same timestamp depend on what was
+rendered before it.
 
 ### Running it locally
 
@@ -391,35 +400,35 @@ npm ci && npx playwright install chromium
 npm run test:browser
 ```
 
-`npm test` needs nothing installed. It runs on Node's built-in test runner and
-covers the data pipeline, the SVG renderer, the GitHub client (against a stubbed
-API) and the CLI end to end.
+`npm test` needs nothing installed. It runs on Node's built-in test runner
+and covers the data pipeline, the SVG renderer, the GitHub client (against a
+stubbed API) and the CLI end to end.
 
-The browser test is separate because it needs Chromium, and it is the one that
-matters most: every defect found while building this was a runtime one — a
-renderer that drew nothing, a HUD stuck at `opacity: 0`, a handler wired to the
-wrong argument — and none of it is reachable without running the page. It boots
-the real site and drives it, failing on any JavaScript error.
+The browser test is separate because it needs Chromium, and it is the one
+that matters most. Every defect found while building this was a runtime one:
+a renderer that drew nothing, a HUD stuck at `opacity: 0`, a handler wired to
+the wrong argument. None of that is reachable without running the page. So
+the suite boots the real site, drives it, and fails on any JavaScript error.
 
 Both run on every pull request.
 
 ### Deploying your own
 
-Fork it, then **Settings → Pages → Source: GitHub Actions**. There is no build
-step: the workflow syntax-checks the sources, regenerates the bundled example
-from the repo's own git log, and uploads the tree as-is.
+Fork it, then **Settings → Pages → Source: GitHub Actions**. There is no
+build step. The workflow syntax-checks the sources, regenerates the bundled
+example from the repo's own git log, and uploads the tree as-is.
 
-What keeps the deployed page the *whole* product rather than a static shell:
+What keeps the deployed page the whole product rather than a static shell:
 
-- **`.nojekyll`** stops GitHub running the tree through Jekyll, which would
+- `.nojekyll` stops GitHub running the tree through Jekyll, which would
   mangle `vendor/` and drop paths it considers private.
-- **Every path is relative**, including the import map, so the app works at
+- Every path is relative, including the import map, so the app works at
   `/reposense/`, at a user site, or behind a custom domain.
-- **Routing lives in the location hash**, so deep links, the Back button and
+- Routing lives in the location hash, so deep links, the Back button and
   refreshes work with no server rewrite rules.
-- **`404.html`** returns stray paths to the app, turning
-  `…/reposense/owner/repo` into `…/reposense/#/owner/repo`.
+- `404.html` returns stray paths to the app. `…/reposense/owner/repo`
+  becomes `…/reposense/#/owner/repo`.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

@@ -2,7 +2,7 @@
  * Static SVG renderer.
  *
  * The same model and layout the WebGL viewer uses, projected isometrically and
- * emitted as plain SVG. No DOM, no three.js, no browser — which is what makes
+ * emitted as plain SVG. No DOM, no three.js, no browser. That is what makes
  * it usable from a GitHub Action, and what makes the output a few hundred
  * kilobytes of vector rather than a screenshot.
  *
@@ -96,7 +96,7 @@ const n = (v) => (Math.abs(v) < 0.005 ? '0' : v.toFixed(2));
  * Build-in animation, as CSS inside the SVG.
  *
  * GitHub strips <script> from SVG but renders it as an image, and CSS
- * animation inside an image still runs — which is what lets a README show
+ * animation inside an image still runs. That is what lets a README show
  * motion without shipping a multi-megabyte GIF.
  *
  * The cycle spends most of its length fully built, so a reader arriving at any
@@ -114,7 +114,7 @@ ${rules.join('')}
 @media (prefers-reduced-motion:reduce){.r0,.r1,.r2,.r3,.r4,.r5,.r6,.r7,.r8,.r9{animation:none}}
 </style>`;
 }
-/** Deterministic PRNG — renderSvg must produce identical bytes every run. */
+/** Deterministic PRNG; renderSvg must produce identical bytes every run. */
 function mulberry32(seed) {
   let a = seed >>> 0;
   return () => {
@@ -213,7 +213,7 @@ export function renderSvg(payload, opts = {}) {
     const path = `${ln(outer)}${[...inner].reverse().map((p) => `L${n(p.x)} ${n(p.y)}`).join('')}Z`;
     // The platform's visible thickness: the outer edge extruded downward.
     const skirtPath = `${ln(outer)}${[...hem].reverse().map((p) => `L${n(p.x)} ${n(p.y)}`).join('')}Z`;
-    // The rim is the outer arc alone — an open stroke, not the whole outline.
+    // The rim is the outer arc alone: an open stroke, not the whole outline.
     const rimPath = ln(outer);
 
     const depth = depthOf(Math.cos(d.aMid) * r0, Math.sin(d.aMid) * r0) - 1e6; // floors first
@@ -234,8 +234,8 @@ export function renderSvg(payload, opts = {}) {
   }
 
   /* ── towers ───────────────────────────────────────────────────────────────
-     Faces carry vertical gradients — grounded dark at the base rising into a
-     lit top — and the pure language colour is reserved for a thin crown
+     Faces carry vertical gradients, grounded dark at the base rising into a
+     lit top, and the pure language colour is reserved for a thin crown
      stroke around the top face. Buildings read as buildings lit from within,
      not extruded swatches. Gradients are shared per colour, so a repository
      with twenty languages costs forty defs, not one per tower. */
@@ -361,7 +361,7 @@ export function renderSvg(payload, opts = {}) {
       bx += w + gap;
     }
 
-    // The key: dot, name, share — laid out until the row runs out of width.
+    // The key: dot, name, share, laid out until the row runs out of width.
     const keyY = barY + unit * 2.1;
     let kx = left;
     let key = '';
@@ -417,8 +417,8 @@ export function renderSvg(payload, opts = {}) {
     stars = `<g>${dots}</g>`;
   }
 
-  // The glow pools *under* the structure — city light on the ground plane —
-  // instead of a fog bank floating through its middle.
+  // The glow pools *under* the structure, like city light on the ground
+  // plane, instead of a fog bank floating through its middle.
   const glowCX = (minX + maxX) / 2;
   const glowCY = maxY - (maxY - minY) * 0.16;
   const glowRX = (maxX - minX) * 0.36;

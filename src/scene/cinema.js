@@ -131,7 +131,7 @@ export class Cinema {
    * were framed against.
    *
    * three.js fixes the *vertical* field of view, so a narrow or portrait
-   * viewport sees less horizontally at the same distance — and a radial
+   * viewport sees less horizontally at the same distance, and a radial
    * structure is far wider than it is tall. Without this correction a phone in
    * portrait crops the outer rings straight off the sides.
    */
@@ -185,7 +185,7 @@ export class Cinema {
    * `dt` is capped at 50ms so a backgrounded tab cannot make an animation jump.
    * Integrating that cap makes every animation advance per *frame* instead of
    * per second, so on a machine that cannot hold 60fps a 48-second tour quietly
-   * stretches to several minutes — and the recorder promises 48 seconds.
+   * stretches to several minutes, and the recorder promises 48 seconds.
    */
   flyTo(pos, target, duration = 1.2) {
     // stop() rather than clearing `playing`: the tour hides the entire HUD via
@@ -335,7 +335,7 @@ export class Cinema {
  * Records the live canvas to a WebM file.
  *
  * MediaRecorder captures exactly what is on screen, so the export always
- * matches what the viewer just watched — including their own camera moves.
+ * matches what the viewer just watched, including their own camera moves.
  */
 export class Recorder {
   static supported() {

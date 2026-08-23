@@ -34,7 +34,7 @@ export function computeLayout(model, opts = {}) {
   //
   // Height is normalised against the 98th percentile file rather than the
   // largest one. Scaling to the maximum makes every tower tall whenever a
-  // repository's files are of similar size — the common case — and once towers
+  // repository's files are of similar size, which is the common case, and once towers
   // exceed the ring spacing, neighbouring rings merge into one wall instead of
   // reading as terraces. Anchoring on p98 keeps the bulk comfortably below that
   // spacing and lets a genuinely huge file rise above it as a landmark.
@@ -95,8 +95,8 @@ export function computeLayout(model, opts = {}) {
  * A radial layout is only centred on the origin when the tree is balanced. Real
  * repositories are not: one vendored dependency or generated tree becomes a
  * long thin arm that drags the structure off-centre. Framing on the
- * weight-weighted centroid — and sizing by the spread around it, ignoring the
- * outermost few per cent — keeps the mass of the repository in shot.
+ * weight-weighted centroid, sized by the spread around it with the outermost
+ * few per cent ignored, keeps the mass of the repository in shot.
  */
 function frame(files, maxRadius, maxRing) {
   if (!files.length) {
@@ -150,8 +150,8 @@ function assign(node, ringGap, band) {
   // Files do not. Splitting a folder's arc among its files alone gives each one
   // a razor-thin wedge as soon as a folder holds more than a handful, and a
   // hundred of them read as a striped wall rather than as buildings. They are
-  // packed into a grid across the terrace instead — angular columns by radial
-  // rows — so each gets a footprint you can actually see and hover. Nothing is
+  // packed into a grid across the terrace instead, angular columns by radial
+  // rows, so each gets a footprint you can actually see and hover. Nothing is
   // lost: a file's size is already its height.
   const dirWeight = dirs.reduce((t, c) => t + c.weight, 0);
   const fileWeight = files.reduce((t, c) => t + c.weight, 0);
