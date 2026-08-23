@@ -11,23 +11,23 @@ how recently it changed.
 [**Open the visualizer →**](https://ilevytate.github.io/reposense/)
 
 <a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense">
-  <img alt="A montage of the cinematic tour over RepoSense's own repository: a sweep across the terraced structure, the history replaying commit by commit, then the contributors orbiting the districts they built" src="public/reposense-tour.webp" width="100%">
+  <img alt="The Arcology view of RepoSense's own repository: concentric terraces stepping outward and upward, with a glowing tower on each one for every file" src="public/shots/arcology.png" width="100%">
 </a>
 
-<sub>The three views, cut from the cinematic tour of this repository — clicking opens the same flight live in your browser.<br>Rendered by the same pipeline the <a href="#3-the-action">Action</a> uses to export footage of <em>your</em> repository. See <a href="#put-it-in-your-readme">Put it in your README</a>.</sub>
+<sub>RepoSense rendering itself — clicking any shot opens this repository in the live explorer.</sub>
 
 <table>
   <tr>
-    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Arcology view: every file a glowing tower on its directory's terrace" src="public/shots/arcology.png"></a></td>
-    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Chronology view: the timeline scrubber replaying the repository's history" src="public/shots/chronology.png"></a></td>
-    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Constellation view: contributors orbiting the districts they built" src="public/shots/constellation.png"></a></td>
+    <td width="50%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Chronology view: the timeline scrubber replaying the repository's history" src="public/shots/chronology.png"></a></td>
+    <td width="50%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Constellation view: contributors orbiting the districts they built" src="public/shots/constellation.png"></a></td>
   </tr>
   <tr align="center">
-    <td><sub><b>Arcology</b> — rings are depth, height is size, colour is language</sub></td>
     <td><sub><b>Chronology</b> — scrub the git history; files flare as they are created</sub></td>
     <td><sub><b>Constellation</b> — who built which part of it</sub></td>
   </tr>
 </table>
+
+<sub><b>Arcology</b> above — rings are depth, height is size, colour is language.</sub>
 
 </div>
 
@@ -124,7 +124,6 @@ jobs:
       - uses: iLevyTate/reposense@main
         with:
           output: reposense.svg
-          animate: 'true'
           commit: 'true'
 ```
 
@@ -194,22 +193,7 @@ README.
 
 ### Put it in your README
 
-Two things embed well. The **animated SVG** is a few dozen kilobytes, refreshes
-itself on every push, and its motion is CSS inside the image so it plays where
-scripts are stripped:
-
-<a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="public/reposense-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="public/reposense-light.svg">
-    <img alt="RepoSense rendering its own repository as an isometric structure: concentric terraces stepping outward and upward, with a tower standing on each one for every file" src="public/reposense-dark.svg" width="100%">
-  </picture>
-</a>
-
-The **tour footage** at the top of this README is the second kind: point the
-Action's `output` at a `.webp` (animated, and about a tenth the bytes of the
-same footage as a GIF — this page's is 6.6 MB) and it records the same
-cinematic pass over your repository.
+The rendered SVG is a few dozen kilobytes and refreshes itself on every push:
 
 ```markdown
 ![Repository structure](reposense.svg)
