@@ -203,15 +203,28 @@ export class Cinema {
     this.stage.controls.enabled = false;
   }
 
-  /** Frames a single file tower head-on. */
+  /**
+   * Frames a single file tower.
+   *
+   * Three-quarter angle rather than head-on: rotated off the radial so the
+   * selection beam is beside the building instead of between it and the
+   * camera, pulled back and lifted so the shot reads as a establishing view
+   * of the tower in its district, not a wall filling the frame.
+   */
   flyToNode(node, lift) {
     const y = node.ring * lift;
-    const target = new THREE.Vector3(node.x, y + node.height * 0.5, node.z);
+    const target = new THREE.Vector3(node.x, y + node.height * 0.55, node.z);
     const outward = new THREE.Vector3(node.x, 0, node.z).normalize();
-    const dist = Math.max(26, node.height * 2.6);
+    const swing = 0.5; // radians off the radial
+    const dir = new THREE.Vector3(
+      outward.x * Math.cos(swing) - outward.z * Math.sin(swing),
+      0,
+      outward.x * Math.sin(swing) + outward.z * Math.cos(swing),
+    );
+    const dist = Math.max(40, node.height * 3.6);
     const pos = target
       .clone()
-      .add(outward.multiplyScalar(dist * 0.75))
+      .add(dir.multiplyScalar(dist * 0.85))
       .add(new THREE.Vector3(0, dist * 0.55, 0));
     this.flyTo(pos, target, 1.1);
   }

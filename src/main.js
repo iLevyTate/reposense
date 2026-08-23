@@ -156,6 +156,11 @@ function initLaunch() {
   refreshRateHint();
   drawLaunchBackdrop();
   app.showLaunchError = showError;
+
+  // Desktop lands ready to type; touch devices are spared the popped keyboard.
+  if (matchMedia('(pointer: fine)').matches && innerWidth > 900 && !location.hash) {
+    input.focus();
+  }
 }
 
 async function refreshRateHint() {

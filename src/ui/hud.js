@@ -208,6 +208,8 @@ export class Hud {
     if (file.commits) bits.push(plural(file.commits, 'commit'));
     if (file.lastTouched) bits.push(relTime(file.lastTouched));
     el.innerHTML = `<div class="tt-name">${esc(file.name)}</div><div class="tt-meta">${esc(bits.join(' · '))}</div>`;
+    // The language colour ties the tooltip to the tower it describes.
+    el.style.borderLeft = `2px solid ${colorOf(file.lang)}`;
     el.hidden = false;
     // Flip the tooltip near the viewport edges so it never clips.
     const rect = el.getBoundingClientRect();

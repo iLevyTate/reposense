@@ -216,8 +216,12 @@ code, kbd, .mono { font-family: var(--mono); }
 /* touch-action keeps one-finger orbit and two-finger pinch with the camera
    instead of scrolling or zooming the page (OrbitControls sets it inline too;
    this covers the frame before it attaches). */
-.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.stage canvas:active { cursor: grabbing; }
+/* z-index + isolation: CSS2DRenderer assigns each label a depth-sorted
+   z-index; without a stacking context here those values escape and paint
+   scene labels over the UI panels. */
+.labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; isolation: isolate; }
 .labels > * { pointer-events: none; }
 
 .vignette {
@@ -225,7 +229,7 @@ code, kbd, .mono { font-family: var(--mono); }
   background: radial-gradient(120% 90% at 50% 50%, transparent 46%, rgba(2, 4, 10, 0.72) 100%);
 }
 .scanline {
-  position: absolute; inset: 0; pointer-events: none; opacity: 0.055;
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.028;
   background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.9) 0 1px, transparent 1px 3px);
   mix-blend-mode: overlay;
 }
@@ -298,7 +302,9 @@ code, kbd, .mono { font-family: var(--mono); }
   background: var(--panel); border: 1px solid var(--border);
   border-radius: var(--radius); backdrop-filter: blur(14px);
   box-shadow: var(--shadow);
+  animation: panelIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+@keyframes panelIn { from { opacity: 0; transform: translateY(8px); } }
 .panel-left { top: 74px; left: 18px; width: 246px; }
 .panel-right { top: 74px; right: 18px; width: 288px; display: flex; flex-direction: column; max-height: calc(100vh - 190px); }
 
@@ -359,9 +365,19 @@ code, kbd, .mono { font-family: var(--mono); }
 .insp-actions a, .insp-actions button {
   flex: 1; text-align: center; padding: 6px 9px; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: rgba(120, 160, 220, 0.08);
-  font-size: 11px; color: var(--text-dim); cursor: pointer; transition: all 0.16s;
+  font-size: 11px; font-weight: 500; color: var(--text-dim); cursor: pointer;
+  transition: all 0.16s;
 }
-.insp-actions a:hover, .insp-actions button:hover { color: var(--text); border-color: var(--border-bright); text-decoration: none; }
+.insp-actions a:hover, .insp-actions button:hover {
+  color: var(--text); border-color: var(--border-bright);
+  background: rgba(120, 160, 220, 0.16); text-decoration: none;
+}
+.insp-actions button[data-act="focus"] {
+  border-color: rgba(102, 224, 255, 0.35); color: var(--accent);
+  background: rgba(102, 224, 255, 0.08);
+}
+.insp-actions button[data-act="focus"]:hover { background: rgba(102, 224, 255, 0.16); color: var(--accent); }
+.insp-actions a:active, .insp-actions button:active { transform: scale(0.97); }
 
 .hitlist { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; min-height: 0; }
 .hitlist li { }
@@ -371,7 +387,8 @@ code, kbd, .mono { font-family: var(--mono); }
   font-family: var(--mono); font-size: 11px; color: var(--text-dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.hitlist button:hover { background: rgba(120, 160, 220, 0.12); color: var(--text); }
+.hitlist button { transition: background 0.12s, color 0.12s, padding-left 0.12s; }
+.hitlist button:hover { background: rgba(120, 160, 220, 0.12); color: var(--text); padding-left: 11px; }
 .hitlist .hl { color: var(--accent); }
 
 /* dock */
@@ -379,7 +396,9 @@ code, kbd, .mono { font-family: var(--mono); }
   position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 5;
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
   max-width: calc(100vw - 36px);
+  animation: dockIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+@keyframes dockIn { from { opacity: 0; transform: translate(-50%, 10px); } }
 .modes, .tools, .timeline {
   display: flex; align-items: center; gap: 4px; padding: 5px;
   background: var(--panel); border: 1px solid var(--border);
@@ -400,6 +419,11 @@ code, kbd, .mono { font-family: var(--mono); }
 .mode:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .timeline { padding: 5px 14px 5px 5px; gap: 10px; }
+#time-play {
+  background: rgba(102, 224, 255, 0.12); border-color: rgba(102, 224, 255, 0.3);
+  color: var(--accent); border-radius: 50%;
+}
+#time-play:hover { background: rgba(102, 224, 255, 0.22); color: var(--accent); }
 
 /* The activity strip. One measure — commit volume over time — with the played
    span lit and the rest recessive. Progress is emphasis within one hue, not a
@@ -525,6 +549,8 @@ code, kbd, .mono { font-family: var(--mono); }
   background: var(--panel-solid); color: var(--text);
   padding: 22px 24px; max-width: 420px; box-shadow: var(--shadow);
 }
+.help[open] { animation: helpIn 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes helpIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
 .help::backdrop { background: rgba(4, 6, 13, 0.7); backdrop-filter: blur(4px); }
 .help h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); }
 .help h2 + ul { margin-bottom: 20px; }

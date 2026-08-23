@@ -24,7 +24,7 @@ import { hexToRgb, colorOf } from '../palette.js';
 const MAX_LABELS = 64;
 
 /** Cool grey-blue the directory floors are tinted toward. */
-const STRUCTURE_TINT = { r: 0.42, g: 0.52, b: 0.68 };
+const STRUCTURE_TINT = { r: 0.36, g: 0.46, b: 0.66 };
 
 function mixToward(c, target, t) {
   return {
@@ -50,17 +50,86 @@ export class Arcology {
       uTime: { value: 0 },
       uHeatBoost: { value: 1 },
       uFade: { value: 0 }, // 0 = fully built, 1 = not yet revealed
+      // Atmospheric perspective, scaled to this structure: the far side of a
+      // big repository recedes into the backdrop instead of stacking on the
+      // near side at full contrast.
+      uFogColor: { value: new THREE.Color(0x04060d) },
+      uFogDensity: { value: 1 / Math.pow(Math.max(120, layout.fitRadius) * 6.5, 2) },
     };
 
     this.fileByInstance = layout.files;
     this.instanceByPath = new Map(layout.files.map((f, i) => [f.path, i]));
 
+    this.#buildGround();
     this.#buildTowers();
     this.#buildTerraces();
     this.#buildBridges();
     this.#buildCore();
     this.#buildLabels();
     this.#buildSelection();
+  }
+
+  /* ------------------------------------------------------------------ ground */
+
+  /**
+   * The plane the arcology stands on: a pool of light under the core, fading
+   * out through faint concentric guides at each ring radius. Without it the
+   * structure floats in a void; with it the whole composition is anchored,
+   * and the guides quietly restate the layout's grammar — rings are depth.
+   */
+  #buildGround() {
+    const maxR = ((this.layout.maxRing ?? 4) + 2) * this.layout.ringGap + this.layout.band;
+    const R = maxR * 2.1;
+    const geo = new THREE.CircleGeometry(R, 96);
+    geo.rotateX(-Math.PI / 2);
+
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        ...this.uniforms,
+        uRingGap: { value: this.layout.ringGap },
+        uMaxR: { value: maxR },
+      },
+      transparent: true,
+      depthWrite: false,
+      vertexShader: `
+        varying vec2 vXZ;
+        varying float vDist;
+        void main() {
+          vXZ = position.xz;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vDist = length(mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform float uFade;
+        uniform float uRingGap;
+        uniform float uMaxR;
+        uniform vec3 uFogColor;
+        uniform float uFogDensity;
+        varying vec2 vXZ;
+        varying float vDist;
+        void main() {
+          float r = length(vXZ);
+          // Light pooled under the core, dying away with radius.
+          float pool = exp(-pow(r / (uMaxR * 0.6), 2.0));
+          vec3 col = mix(vec3(0.006, 0.01, 0.026), vec3(0.045, 0.085, 0.165), pool);
+          // Concentric guides at the ring radii, strongest near the middle.
+          float band = abs(fract(r / uRingGap + 0.5) - 0.5) * uRingGap;
+          float line = smoothstep(0.8, 0.0, band) * smoothstep(uMaxR * 1.7, uMaxR * 0.25, r);
+          col += vec3(0.24, 0.38, 0.62) * line * 0.055;
+          float fog = 1.0 - exp(-vDist * vDist * uFogDensity);
+          col = mix(col, uFogColor, fog * 0.7);
+          // The disc dissolves at its rim and follows the build-in reveal.
+          float alpha = smoothstep(uMaxR * 2.05, uMaxR * 1.1, r) * (1.0 - uFade);
+          gl_FragColor = vec4(col, alpha * 0.9);
+        }`,
+    });
+
+    this.ground = new THREE.Mesh(geo, mat);
+    this.ground.position.y = -this.layout.band * 0.26;
+    this.ground.renderOrder = -2;
+    this.ground.frustumCulled = false;
+    this.group.add(this.ground);
   }
 
   /* ------------------------------------------------------------------ towers */
@@ -162,12 +231,21 @@ export class Arcology {
         varying vec3 vViewDir;
         varying float vAlpha;
         varying float vFlash;
+        varying vec3 vLocal;
+        varying vec3 vNLocal;
+        varying vec3 vScale;
+        varying float vSeed;
+        varying float vDist;
 
         void main() {
           vFlash = aFlash;
           vColor = aColor;
           vHeat = aHeat;
           vState = aState;
+          vSeed = aSeed;
+          vLocal = position;
+          vNLocal = normal;
+          vScale = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
           vY = position.y; // 0 at base, 1 at tip (box was translated)
 
           // The reveal sweeps outward: outer rings finish building last.
@@ -184,12 +262,15 @@ export class Arcology {
           vNormalW = normalize(mat3(instanceMatrix) * normal);
           vec4 mv = modelViewMatrix * world;
           vViewDir = normalize(-mv.xyz);
+          vDist = length(mv.xyz);
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
         precision highp float;
         uniform float uTime;
         uniform float uHeatBoost;
+        uniform vec3 uFogColor;
+        uniform float uFogDensity;
 
         varying vec3 vColor;
         varying float vY;
@@ -199,6 +280,11 @@ export class Arcology {
         varying vec3 vViewDir;
         varying float vAlpha;
         varying float vFlash;
+        varying vec3 vLocal;
+        varying vec3 vNLocal;
+        varying vec3 vScale;
+        varying float vSeed;
+        varying float vDist;
 
         void main() {
           if (vAlpha < 0.5) discard;
@@ -213,17 +299,46 @@ export class Arcology {
           // across the entire frame as white.
           float fres = pow(max(1.0 - dot(normalize(vNormalW), normalize(vViewDir)), 0.0), 2.4);
 
-          // Windows-in-a-tower feel: dark plinth fading to a lit crown.
+          // Dark plinth fading to a lit crown. The additive light scales with
+          // the tower's stature: a two-unit stub with a full crown used to
+          // bloom into a featureless white lump, and a repository is mostly
+          // stubs.
           float crown = smoothstep(0.15, 1.0, vY);
-          vec3 base = mix(vColor * 0.14, vColor, 0.52 + 0.48 * crown);
-          vec3 col = base * (0.26 + 0.62 * lambert);
-          col += vColor * fres * 0.26;
-          col += vColor * crown * crown * 0.16;
+          float stature = smoothstep(1.5, 9.0, vScale.y);
+          vec3 base = mix(vColor * 0.14, vColor, 0.42 + 0.44 * crown);
+          vec3 col = base * (0.24 + 0.58 * lambert);
+          col += vColor * fres * mix(0.07, 0.18, stature);
+          col += vColor * crown * crown * mix(0.04, 0.12, stature);
+
+          // Procedural windows on the side faces. Each face carries a grid of
+          // slightly inset panes; a per-cell hash decides which are lit. This
+          // is what makes a close fly-by read as an inhabited structure rather
+          // than a glowing slab — and it is a pure function of geometry and
+          // seed, so every frame and every renderer agrees.
+          float sideness = step(abs(vNLocal.y), 0.5);
+          float u = abs(vNLocal.x) > 0.5 ? (vLocal.z + 0.5) : (vLocal.x + 0.5);
+          float faceW = abs(vNLocal.x) > 0.5 ? vScale.z : vScale.x;
+          float h = vY * vScale.y;
+          float cols = max(1.0, floor(faceW / 1.05));
+          float rowH = 1.55;
+          vec2 cell = vec2(fract(u * cols), fract(h / rowH));
+          float pane = step(0.2, cell.x) * step(cell.x, 0.8) * step(0.3, cell.y) * step(cell.y, 0.74);
+          vec2 id = vec2(floor(u * cols), floor(h / rowH));
+          float litHash = fract(sin(dot(vec3(id, vSeed * 61.7), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          float lit = step(0.42, litHash);
+          // Only towers tall enough to have storeys get windows, and the top
+          // band stays clean so the crown keeps its line.
+          float windows = pane * sideness * step(4.0, vScale.y) * step(0.04, vY) * (1.0 - step(0.88, vY));
+          vec3 glass = mix(vColor * 0.10, mix(vColor, vec3(1.0, 0.93, 0.78), 0.5) * 1.35, lit);
+          col = mix(col, glass, windows * 0.85);
+
+          // Contact shading where the tower meets its terrace.
+          col *= mix(0.5, 1.0, smoothstep(0.0, 0.16, vY));
 
           // Churn reads as a heat shimmer climbing the tower.
           float pulse = 0.6 + 0.4 * sin(uTime * 2.2 + vY * 6.0);
-          col += vColor * vHeat * uHeatBoost * pulse * (0.5 + crown) * 1.1;
-          col += vec3(1.0, 0.55, 0.25) * vHeat * uHeatBoost * crown * 0.40;
+          col += vColor * vHeat * uHeatBoost * pulse * (0.5 + crown) * 0.9;
+          col += vec3(1.0, 0.55, 0.25) * vHeat * uHeatBoost * crown * 0.34;
 
           // A file appearing in the timeline flares white and settles. It reads
           // as the moment of creation rather than as decoration: what lights up
@@ -235,8 +350,16 @@ export class Arcology {
             col *= vState * 2.2;
             alpha = 0.30;
           } else if (vState > 1.5) {   // search hit
-            col = mix(col, vec3(1.0), 0.30) * 2.4;
+            // Bright enough to find from across the structure, restrained
+            // enough that flying up to it still shows a building rather than
+            // a white nuke. The slow breath separates "found" from "lit".
+            float breath = 0.92 + 0.14 * sin(uTime * 2.6);
+            col = mix(col, vec3(1.0), 0.18) * 1.55 * breath;
           }
+
+          // Atmospheric perspective.
+          float fog = 1.0 - exp(-vDist * vDist * uFogDensity);
+          col = mix(col, uFogColor, fog * 0.7);
 
           gl_FragColor = vec4(col, alpha);
         }`,
@@ -269,7 +392,7 @@ export class Arcology {
       // in the full language colour: a repo that is 97% one language would
       // otherwise render as one flat sheet, and the towers — which carry the
       // real per-file colour — would have nothing to stand out against.
-      const c = mixToward(hexToRgb(colorOf(d.lang)), STRUCTURE_TINT, 0.45);
+      const c = mixToward(hexToRgb(colorOf(d.lang)), STRUCTURE_TINT, 0.6);
       // Deeper folders sit further out and read dimmer, which keeps the eye on
       // the trunk of the tree rather than the leaves.
       const dim = Math.max(0.28, 1 - d.depth * 0.11);
@@ -279,8 +402,8 @@ export class Arcology {
         const ca = Math.cos(a);
         const sa = Math.sin(a);
         floors.pos.push(ca * r0, 0, sa * r0, ca * r1, 0, sa * r1);
-        floors.col.push(c.r * 0.045 * dim, c.g * 0.045 * dim, c.b * 0.045 * dim);
-        floors.col.push(c.r * 0.26 * dim, c.g * 0.26 * dim, c.b * 0.26 * dim);
+        floors.col.push(c.r * 0.04 * dim, c.g * 0.04 * dim, c.b * 0.04 * dim);
+        floors.col.push(c.r * 0.2 * dim, c.g * 0.2 * dim, c.b * 0.2 * dim);
         floors.ring.push(ring, ring);
 
         // Rims keep the undiluted language colour so each tier still reads.
@@ -298,6 +421,24 @@ export class Arcology {
       }
       fBase += (segs + 1) * 2;
       rBase += (segs + 1) * 2;
+
+      // The platform's visible thickness: the outer edge extruded downward.
+      // Without it a terrace seen from a low angle is a sheet of paper.
+      const SKIRT = this.layout.band * 0.22;
+      for (let s = 0; s <= segs; s += 1) {
+        const a = d.a0 + (span * s) / segs;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        floors.pos.push(ca * r1, 0, sa * r1, ca * r1, -SKIRT, sa * r1);
+        floors.col.push(c.r * 0.16 * dim, c.g * 0.16 * dim, c.b * 0.16 * dim);
+        floors.col.push(c.r * 0.02, c.g * 0.02, c.b * 0.02);
+        floors.ring.push(ring, ring);
+      }
+      for (let s = 0; s < segs; s += 1) {
+        const i = fBase + s * 2;
+        floors.idx.push(i, i + 1, i + 2, i + 1, i + 3, i + 2);
+      }
+      fBase += (segs + 1) * 2;
     }
 
     this.terraces = new THREE.Mesh(
@@ -318,6 +459,7 @@ export class Arcology {
 
   #surfaceMaterial({ opacity, additive, depthWrite }) {
     return new THREE.ShaderMaterial({
+      defines: { ADDITIVE: additive ? 'true' : 'false' },
       uniforms: { ...this.uniforms, uOpacity: { value: opacity } },
       transparent: true,
       depthWrite,
@@ -330,21 +472,30 @@ export class Arcology {
         uniform float uFade;
         varying vec3 vColor;
         varying float vAlpha;
+        varying float vDist;
         void main() {
           vColor = aColor;
           float reveal = clamp((1.0 - uFade) * 3.0 - aRing * 0.42, 0.0, 1.0);
           vAlpha = reveal * reveal * (3.0 - 2.0 * reveal);
           vec3 p = position;
           p.y += aRing * uLift;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          vDist = length(mv.xyz);
+          gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
         uniform float uOpacity;
+        uniform vec3 uFogColor;
+        uniform float uFogDensity;
         varying vec3 vColor;
         varying float vAlpha;
+        varying float vDist;
         void main() {
           if (vAlpha < 0.01) discard;
-          gl_FragColor = vec4(vColor, uOpacity * vAlpha);
+          float fog = 1.0 - exp(-vDist * vDist * uFogDensity);
+          // Additive surfaces dim with distance; opaque ones mix to the sky.
+          vec3 col = ADDITIVE ? vColor * (1.0 - fog * 0.85) : mix(vColor, uFogColor, fog * 0.7);
+          gl_FragColor = vec4(col, uOpacity * vAlpha);
         }`,
     });
   }
@@ -394,20 +545,26 @@ export class Arcology {
           uniform float uFade;
           varying vec3 vColor;
           varying float vAlpha;
+          varying float vDist;
           void main() {
             vColor = aColor;
             float reveal = clamp((1.0 - uFade) * 3.0 - aRing * 0.42, 0.0, 1.0);
             vAlpha = reveal;
             vec3 p = position;
             p.y += aRing * uLift;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+            vec4 mv = modelViewMatrix * vec4(p, 1.0);
+            vDist = length(mv.xyz);
+            gl_Position = projectionMatrix * mv;
           }`,
         fragmentShader: `
+          uniform float uFogDensity;
           varying vec3 vColor;
           varying float vAlpha;
+          varying float vDist;
           void main() {
             if (vAlpha < 0.01) discard;
-            gl_FragColor = vec4(vColor, 0.65 * vAlpha);
+            float fog = 1.0 - exp(-vDist * vDist * uFogDensity);
+            gl_FragColor = vec4(vColor * (1.0 - fog * 0.85), 0.65 * vAlpha);
           }`,
       }),
     );

@@ -22,6 +22,11 @@ export class Constellation {
     this.group.visible = false;
     this.uniforms = { uTime: { value: 0 }, uReveal: { value: 0 } };
     this.nodes = [];
+    // Mode changes ease in and out rather than snapping; `reveal` chases
+    // `targetReveal` in update(), driven by dt so the offline recorder's
+    // fixed-step frames land on the same values every render.
+    this.reveal = 0;
+    this.targetReveal = 0;
 
     // Orbits are sized from the structure so contributors circle the repository
     // at a readable distance whether it is a script or a monorepo.
@@ -59,7 +64,7 @@ export class Constellation {
       const color = new THREE.Color().setHSL(0.52 + (i % 7) * 0.045, 0.72, 0.62);
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(size, 24, 18),
-        new THREE.MeshBasicMaterial({ color, toneMapped: false }),
+        new THREE.MeshBasicMaterial({ color, toneMapped: false, transparent: true }),
       );
 
       // Avatars are decorative; a failed load leaves the coloured sphere.
@@ -84,7 +89,12 @@ export class Constellation {
           depthWrite: false,
           blending: THREE.AdditiveBlending,
           side: THREE.BackSide,
-          uniforms: { uColor: { value: color }, uTime: this.uniforms.uTime, uSeed: { value: i * 1.7 } },
+          uniforms: {
+            uColor: { value: color },
+            uTime: this.uniforms.uTime,
+            uReveal: this.uniforms.uReveal,
+            uSeed: { value: i * 1.7 },
+          },
           vertexShader: `
             varying vec3 vN; varying vec3 vV;
             void main() {
@@ -94,7 +104,7 @@ export class Constellation {
               gl_Position = projectionMatrix * mv;
             }`,
           fragmentShader: `
-            uniform vec3 uColor; uniform float uTime; uniform float uSeed;
+            uniform vec3 uColor; uniform float uTime; uniform float uReveal; uniform float uSeed;
             varying vec3 vN; varying vec3 vV;
             void main() {
               // max() before pow: abs(dot) can exceed 1.0 by a float ulp on
@@ -102,7 +112,7 @@ export class Constellation {
               // smears across the whole frame.
               float fres = pow(max(1.0 - abs(dot(vN, vV)), 0.0), 2.6);
               float pulse = 0.7 + 0.3 * sin(uTime * 1.6 + uSeed);
-              gl_FragColor = vec4(uColor * fres * pulse * 2.2, fres * 0.75);
+              gl_FragColor = vec4(uColor * fres * pulse * 2.2 * uReveal, fres * 0.75 * uReveal);
             }`,
         }),
       );
@@ -229,12 +239,34 @@ export class Constellation {
   }
 
   setVisible(v) {
-    this.group.visible = v;
+    this.targetReveal = v ? 1 : 0;
+    if (v) this.group.visible = true; // the fade-out hides it when it lands
   }
 
   update(dt, time) {
-    if (!this.group.visible) return;
+    // Chase the target, then apply the eased value everywhere at once.
+    if (this.reveal !== this.targetReveal) {
+      const step = dt * 2.6;
+      this.reveal = this.reveal < this.targetReveal
+        ? Math.min(this.targetReveal, this.reveal + step)
+        : Math.max(this.targetReveal, this.reveal - step);
+    }
+    if (this.reveal <= 0 && this.targetReveal === 0) {
+      this.group.visible = false;
+      return;
+    }
+    const e = 1 - Math.pow(1 - this.reveal, 3);
     this.uniforms.uTime.value = time;
+    this.uniforms.uReveal.value = e;
+    if (this.links) this.links.material.opacity = 0.5 * e;
+
+    for (const n of this.nodes) {
+      n.holder.scale.setScalar(0.72 + 0.28 * e);
+      const body = n.holder.children[0];
+      if (body?.material) body.material.opacity = e;
+      const label = n.holder.children[2];
+      if (label?.element) label.element.style.opacity = String(e);
+    }
 
     for (const n of this.nodes) {
       const a = n.phase + time * n.speed;
