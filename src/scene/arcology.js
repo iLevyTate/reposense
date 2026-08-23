@@ -208,6 +208,55 @@ export class Arcology {
       aFlash: geo.attributes.aFlash,
     };
     this.group.add(mesh);
+
+    // Contact shadows. A soft dark pool under each tower is what makes a
+    // building sit on its terrace instead of hovering a millimetre above it.
+    // The quads share the towers' appear and ring arrays, so the reveal and
+    // the chronology drive both from one update; the attribute objects are
+    // separate, so both need their dirty flags raised (see #flagShared).
+    const shadowGeo = new THREE.PlaneGeometry(1, 1);
+    shadowGeo.rotateX(-Math.PI / 2);
+    shadowGeo.setAttribute('aRing', new THREE.InstancedBufferAttribute(aRing, 1));
+    shadowGeo.setAttribute('aAppear', new THREE.InstancedBufferAttribute(aAppear, 1));
+    shadowGeo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(aSeed, 1));
+    this.sharedAppear = [this.attrs.aAppear, shadowGeo.attributes.aAppear];
+
+    const shadowMat = new THREE.ShaderMaterial({
+      uniforms: this.uniforms,
+      transparent: true,
+      depthWrite: false,
+      vertexShader: `
+        attribute float aRing;
+        attribute float aAppear;
+        attribute float aSeed;
+        uniform float uFade;
+        varying vec2 vUvL;
+        varying float vA;
+        void main() {
+          vUvL = uv;
+          float reveal = clamp((1.0 - uFade) * 3.0 - aRing * 0.42 - aSeed * 0.25, 0.0, 1.0);
+          vA = aAppear * reveal;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec2 vUvL;
+        varying float vA;
+        void main() {
+          float d = length(vUvL - 0.5) * 2.0;
+          float a = smoothstep(1.0, 0.15, d) * 0.42 * vA;
+          gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+        }`,
+    });
+    this.shadows = new THREE.InstancedMesh(shadowGeo, shadowMat, count);
+    this.shadows.frustumCulled = false;
+    this.shadows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.shadows.renderOrder = -0.5;
+    this.group.add(this.shadows);
+  }
+
+  /** Raise the dirty flag on every attribute object sharing one array. */
+  #flagShared() {
+    for (const attr of this.sharedAppear) attr.needsUpdate = true;
   }
 
   #towerMaterial() {
@@ -703,13 +752,21 @@ export class Arcology {
     const files = this.layout.files;
     const m = new THREE.Matrix4();
     const pos = new THREE.Vector3();
+    const shadowScale = new THREE.Vector3();
     for (let i = 0; i < files.length; i += 1) {
       const f = files[i];
       pos.set(f.x, f.ring * this.lift, f.z);
       m.compose(pos, this.towerParts.quat[i], this.towerParts.scale[i]);
       this.towers.setMatrixAt(i, m);
+
+      const ts = this.towerParts.scale[i];
+      pos.y += 0.07; // just above the terrace, safely clear of z-fighting
+      shadowScale.set(ts.x * 2.3, 1, ts.z * 2.3);
+      m.compose(pos, this.towerParts.quat[i], shadowScale);
+      this.shadows.setMatrixAt(i, m);
     }
     this.towers.instanceMatrix.needsUpdate = true;
+    this.shadows.instanceMatrix.needsUpdate = true;
     this.towers.computeBoundingSphere();
   }
 
@@ -803,7 +860,7 @@ export class Arcology {
         heat[i] = touched ? 0 : f.heat * 0.25;
       }
     }
-    this.attrs.aAppear.needsUpdate = true;
+    this.#flagShared();
     this.attrs.aHeat.needsUpdate = true;
     this.attrs.aFlash.needsUpdate = true;
     return { visible, bytes };
@@ -819,7 +876,7 @@ export class Arcology {
       flash[i] = 0;
       heat[i] = this.fileByInstance[i].heat || 0;
     }
-    this.attrs.aAppear.needsUpdate = true;
+    this.#flagShared();
     this.attrs.aHeat.needsUpdate = true;
     this.attrs.aFlash.needsUpdate = true;
   }
@@ -856,9 +913,12 @@ export class Arcology {
       obj.getWorldPosition(_labelPos);
       const dist = _labelPos.distanceTo(camera.position);
       // Shallow folders stay legible from further out; deep ones only appear
-      // once you fly in, which keeps the wide shots clean.
+      // once you fly in, which keeps the wide shots clean. The last quarter
+      // of the range fades, so labels dissolve instead of popping.
       const threshold = unit * (2.2 + (budget - Math.min(d, budget)) * 0.75);
-      obj.visible = dist < threshold;
+      const fade = Math.max(0, Math.min(1, (threshold - dist) / (threshold * 0.25)));
+      obj.visible = fade > 0.01;
+      if (obj.visible) obj.element.style.opacity = fade.toFixed(3);
     }
   }
 

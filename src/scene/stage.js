@@ -67,6 +67,8 @@ export class Stage {
     this.controls.maxDistance = 2200;
     this.controls.maxPolarAngle = Math.PI * 0.92;
 
+    this.sky = this.#buildSky();
+    this.scene.add(this.sky);
     this.starfield = this.#buildStarfield();
     this.scene.add(this.starfield);
 
@@ -165,6 +167,43 @@ export class Stage {
       this._fastFrames = 0;
       this._scaleCooldown = time + 1.5;
     }
+  }
+
+  /**
+   * The sky is a graded dome, not a flat clear colour. Two faint pools of
+   * colour, a cool cyan low on one side and a violet high on the other, give
+   * the void a horizon and a direction; the stars then sit in an atmosphere
+   * instead of on black glass.
+   */
+  #buildSky() {
+    const geo = new THREE.SphereGeometry(2800, 32, 24);
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      vertexShader: `
+        varying vec3 vDir;
+        void main() {
+          vDir = normalize(position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec3 vDir;
+        void main() {
+          // Base: deep navy at the horizon rising to near-black overhead.
+          float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
+          vec3 col = mix(vec3(0.022, 0.032, 0.062), vec3(0.008, 0.011, 0.022), pow(h, 0.7));
+          // Two colour pools, fixed in world space.
+          float cyan = pow(max(dot(vDir, normalize(vec3(-0.6, -0.12, 0.75))), 0.0), 3.0);
+          float violet = pow(max(dot(vDir, normalize(vec3(0.7, 0.45, -0.5))), 0.0), 3.5);
+          col += vec3(0.012, 0.03, 0.05) * cyan;
+          col += vec3(0.028, 0.016, 0.045) * violet;
+          gl_FragColor = vec4(col, 1.0);
+        }`,
+    });
+    const dome = new THREE.Mesh(geo, mat);
+    dome.renderOrder = -10;
+    dome.frustumCulled = false;
+    return dome;
   }
 
   #buildStarfield() {
