@@ -11,10 +11,23 @@ how recently it changed.
 [**Open the visualizer →**](https://ilevytate.github.io/reposense/)
 
 <a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense">
-  <img alt="Seventeen seconds of the cinematic tour over RepoSense's own repository: the camera sweeps across concentric terraces of glowing towers while captions name each movement" src="public/reposense-tour.webp" width="100%">
+  <img alt="A montage of the cinematic tour over RepoSense's own repository: a sweep across the terraced structure, the history replaying commit by commit, then the contributors orbiting the districts they built" src="public/reposense-tour.webp" width="100%">
 </a>
 
-<sub>The cinematic tour, flying over this repository — clicking it opens the same flight live in your browser.<br>Rendered by the same pipeline the <a href="#3-the-action">Action</a> uses to export a GIF or MP4 of <em>your</em> repository. See <a href="#put-it-in-your-readme">Put it in your README</a>.</sub>
+<sub>The three views, cut from the cinematic tour of this repository — clicking opens the same flight live in your browser.<br>Rendered by the same pipeline the <a href="#3-the-action">Action</a> uses to export footage of <em>your</em> repository. See <a href="#put-it-in-your-readme">Put it in your README</a>.</sub>
+
+<table>
+  <tr>
+    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Arcology view: every file a glowing tower on its directory's terrace" src="public/shots/arcology.png"></a></td>
+    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Chronology view: the timeline scrubber replaying the repository's history" src="public/shots/chronology.png"></a></td>
+    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Constellation view: contributors orbiting the districts they built" src="public/shots/constellation.png"></a></td>
+  </tr>
+  <tr align="center">
+    <td><sub><b>Arcology</b> — rings are depth, height is size, colour is language</sub></td>
+    <td><sub><b>Chronology</b> — scrub the git history; files flare as they are created</sub></td>
+    <td><sub><b>Constellation</b> — who built which part of it</sub></td>
+  </tr>
+</table>
 
 </div>
 
