@@ -48,19 +48,19 @@ const THEMES = {
     rimOpacity: 0.8,
     // Tower faces shade from a grounded base into a lit top; the pure colour
     // is reserved for the crown stroke, which is what reads as light.
-    faceTopLo: 0.3,
-    faceTopHi: 0.56,
+    faceTopLo: 0.32,
+    faceTopHi: 0.66,
     sideTint: [0.3, 0.38, 0.56],
     sideMix: 0.22,
-    rightLo: 0.17,
-    rightHi: 0.8,
-    leftLo: 0.1,
-    leftHi: 0.5,
+    rightLo: 0.18,
+    rightHi: 0.92,
+    leftLo: 0.11,
+    leftHi: 0.58,
     crownOpacity: 0.75,
     // The premium grade: bodies desaturate toward architecture and the
     // saturated colour survives only in rims, crowns and the legend, the same
     // trade the WebGL scene makes.
-    desat: 0.38,
+    desat: 0.32,
     winFill: '#ffe3b0',
     winLitOp: 0.9,
     winShadeOp: 0.3,
@@ -153,6 +153,17 @@ function mulberry32(seed) {
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+/** Linear blend of two hex colours; t = 0 keeps a, t = 1 gives b. */
+function mixHex(a, b, t) {
+  const va = parseInt(a.slice(1), 16);
+  const vb = parseInt(b.slice(1), 16);
+  const c = (sa, sb) => Math.round(sa + (sb - sa) * t);
+  const r = c((va >> 16) & 255, (vb >> 16) & 255);
+  const g = c((va >> 8) & 255, (vb >> 8) & 255);
+  const bl = c(va & 255, vb & 255);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1)}`;
+}
+
 function shade(hex, factor, tint = null, mix = 0, desat = 0) {
   const v = parseInt(hex.slice(1), 16);
   let r = (v >> 16) & 255;
@@ -214,7 +225,7 @@ export function renderSvg(payload, opts = {}) {
   const maxR = ((layout.maxRing ?? 6) + 2) * layout.ringGap + layout.band;
   const fadeOf = (depth) => {
     const t = Math.max(0, Math.min(1, (depth + maxR * 1.45) / (maxR * 2.9)));
-    return 0.55 + 0.45 * t; // far 0.55 → near 1
+    return 0.7 + 0.3 * t; // far 0.7 → near 1
   };
 
   /* ── terraces ─────────────────────────────────────────────────────────── */
@@ -248,9 +259,18 @@ export function renderSvg(payload, opts = {}) {
 
     const depth = depthOf(Math.cos(d.aMid) * r0, Math.sin(d.aMid) * r0) - 1e6; // floors first
     const fade = fadeOf(depth + 1e6);
+    // Distant terraces blend toward the haze instead of going black: the same
+    // atmospheric fog the WebGL scene applies, so far districts read as far
+    // rather than dead.
     const color = colorOf(d.lang);
-    const floor = shade(color, theme.terraceFloor * Math.max(0.5, 1 - d.depth * 0.08), theme.terraceTint, theme.terraceMix);
-    const skirtFill = shade(color, theme.skirt, theme.terraceTint, theme.terraceMix + 0.1);
+    const fog = (1 - fade) / 0.3;
+    const fogTo = theme.dark ? '#101b33' : '#dfe7f3';
+    const floor = mixHex(
+      shade(color, theme.terraceFloor * Math.max(0.66, 1 - d.depth * 0.06), theme.terraceTint, theme.terraceMix),
+      fogTo,
+      fog * 0.55,
+    );
+    const skirtFill = mixHex(shade(color, theme.skirt, theme.terraceTint, theme.terraceMix + 0.1), fogTo, fog * 0.4);
     const cls = animate ? ` class="r${Math.min(ring, RING_CLASSES - 1)}"` : '';
     shapes.push({
       depth,
@@ -375,13 +395,14 @@ export function renderSvg(payload, opts = {}) {
   let minY = bounds.minY - pad;
   let maxY = bounds.maxY + pad;
 
-  // Keep the finished frame no narrower than 2:1 so the result sits well in a
-  // README rather than becoming a tall column on a deep, narrow tree.
+  // Keep the finished frame no narrower than 7:4 so the result sits well in a
+  // README rather than becoming a tall column on a deep, narrow tree. Wider
+  // than that trades drawing for empty margin, which is the worse deal.
   //
   // The legend band is a fraction of the final width, which the width also
   // depends on, so solve it rather than iterate:
   //   W / (drawnH + k·W) >= R   ->   W >= R·drawnH / (1 - R·k)
-  const MIN_RATIO = 2;
+  const MIN_RATIO = 1.75;
   const LEGEND_K = showLegend ? 0.14 : 0;
   const drawnW = maxX - minX;
   const drawnH = maxY - minY;
