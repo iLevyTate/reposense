@@ -1,17 +1,17 @@
 /**
  * The render stage: renderer, camera rig, bloom pipeline, deep-space backdrop.
  *
- * Everything visual in RepoSense leans on the bloom pass — emissive materials
+ * Everything visual in RepoSense leans on the bloom pass. Emissive materials
  * are authored deliberately "too bright" so the bloom threshold picks them up
  * and turns them into light sources rather than lit surfaces.
  *
  * The whole pipeline runs in HDR: scene → half-float target → bloom → ACES
  * tone mapping → FXAA. The FXAA pass exists because post-processing bypasses
- * the canvas's own antialiasing — `antialias: true` on the renderer only
+ * the canvas's own antialiasing: `antialias: true` on the renderer only
  * covers the default framebuffer, so without it every edge goes jagged the
  * moment the composer takes over. It is deliberately FXAA rather than a
  * multisampled render target: resolving MSAA on a half-float target is where
- * real-world drivers break — an ANGLE/D3D machine shipped a build of that and
+ * real-world drivers break. An ANGLE/D3D machine shipped a build of that and
  * rendered every repository as a solid white wash while the software
  * rasteriser in CI drew it perfectly. FXAA is one fragment shader sampling
  * one texture; there is nothing driver-specific left to go wrong. It runs
@@ -51,7 +51,7 @@ export class Stage {
     labelLayer.classList.add('rs-labels');
 
     // Every material in the scene is a custom unlit shader, so this scene
-    // deliberately carries no lights and no fog — they would be dead weight.
+    // deliberately carries no lights and no fog; they would be dead weight.
     this.scene = new THREE.Scene();
 
     this.camera = new THREE.PerspectiveCamera(48, 1, 0.5, 6000);
@@ -72,13 +72,47 @@ export class Stage {
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    // strength / radius / threshold — the threshold is deliberately high so only
-    // emissive crowns and rim strips bloom, not every lit surface.
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.36, 0.72, 0.74);
+    // strength / radius / threshold. The threshold is deliberately high so only
+    // emissive crowns and rim strips bloom, not every lit surface. Restraint
+    // here is what separates "lit" from "music visualiser".
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.68, 0.78);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
-    // Antialiasing, after tone mapping (see the header comment for why this
-    // is FXAA and not MSAA).
+    // The grade, applied after tone mapping on display-referred colour: a
+    // teal lift in the shadows, faint warmth in the highlights, a whisper of
+    // desaturation, and fine film grain quantised to 24fps of scene time.
+    // The grain is seeded from the timestamp, so the offline recorder gets the identical
+    // frame for the identical time. This is the pass that takes the image
+    // from "renderer output" to "graded picture".
+    this.grade = new ShaderPass({
+      name: 'GradeShader',
+      uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float uTime;
+        varying vec2 vUv;
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv);
+          float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+          c.rgb += vec3(0.008, 0.013, 0.019) * (1.0 - smoothstep(0.0, 0.45, lum));
+          c.rgb *= mix(vec3(1.0), vec3(1.02, 1.0, 0.965), smoothstep(0.55, 1.0, lum));
+          c.rgb = mix(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.rgb, 0.965);
+          float frame = floor(uTime * 24.0);
+          float g = hash(gl_FragCoord.xy * 0.7311 + fract(frame * 0.1031) * vec2(173.0, 591.0));
+          c.rgb += (g - 0.5) * 0.016;
+          gl_FragColor = c;
+        }`,
+    });
+    this.composer.addPass(this.grade);
+    // Antialiasing last, after tone mapping and grade (see the header comment
+    // for why this is FXAA and not MSAA).
     this.fxaa = new ShaderPass(FXAAShader);
     this.composer.addPass(this.fxaa);
 
@@ -227,6 +261,7 @@ export class Stage {
       const t = this.clock.elapsedTime;
       this.starfield.userData.material.uniforms.uTime.value = t;
       this.starfield.rotation.y = t * 0.006;
+      this.grade.uniforms.uTime.value = t;
       for (const fn of this.updaters) fn(dt, t);
       this.controls.update();
       this.composer.render();
@@ -243,6 +278,7 @@ export class Stage {
   renderOnce(time) {
     this.starfield.userData.material.uniforms.uTime.value = time;
     this.starfield.rotation.y = time * 0.006;
+    this.grade.uniforms.uTime.value = time;
     // Deliberately no controls.update(): damping is stateful, so it would drag
     // the camera toward wherever the previous frame left it and the same
     // timestamp would render differently depending on what came before. The

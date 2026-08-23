@@ -1,7 +1,7 @@
 /**
  * Browser smoke test.
  *
- * Every defect found while building RepoSense was a runtime one — a renderer
+ * Every defect found while building RepoSense was a runtime one: a renderer
  * that drew nothing, a HUD stuck at opacity 0, a handler wired to the wrong
  * argument. None of it is reachable without actually running the page, so this
  * boots the real static site in Chromium and drives it.
@@ -128,7 +128,7 @@ test('hovering a tower opens the inspector', async () => {
 test('search filters and lists matches', async () => {
   await page.fill('#search-input', 'scene');
   // The search is debounced and the render loop shares the main thread with a
-  // software rasteriser here — wait for the result, not a fixed delay.
+  // software rasteriser here, so wait for the result, not a fixed delay.
   await page.waitForFunction(
     () => document.querySelectorAll('#hitlist button').length > 0,
     { timeout: 15000 },
@@ -208,10 +208,12 @@ test('a phone-sized viewport gets a usable viewer', async () => {
   phone.on('pageerror', (e) => phoneErrors.push(String(e.message)));
   try {
     await phone.goto(`${BASE}#/demo`, { waitUntil: 'domcontentloaded' });
-    await phone.waitForSelector('#viewer:not([hidden])', { timeout: 60000 });
+    // A software rasteriser on a saturated runner can take a minute and a
+    // half just to first paint at phone size; the budget reflects that.
+    await phone.waitForSelector('#viewer:not([hidden])', { timeout: 150000 });
     await phone.waitForTimeout(1500);
 
-    // The page must not scroll sideways — a horizontal overflow on a phone
+    // The page must not scroll sideways; a horizontal overflow on a phone
     // means some fixed-width element is wider than the screen.
     assert.ok(
       await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth),

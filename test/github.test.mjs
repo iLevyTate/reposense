@@ -102,7 +102,7 @@ test('fetchRepo makes no commit requests unless a deep scan is asked for', async
 test('deep scan pages by a constant size and never repeats a commit', async () => {
   // Regression: per_page used to shrink on the final page while `page` stayed a
   // plain counter. Because GitHub pages by offset, requesting per_page=20&page=2
-  // returned commits 21-40 a second time — double-counting their churn — and the
+  // returned commits 21-40 a second time, double-counting their churn, and the
   // tail was never fetched at all.
   await fetchRepo({ owner: 'o', name: 'r' }, { deepScan: 120 });
 
@@ -124,8 +124,8 @@ test('deep scan attributes churn to the right commits', async () => {
   // The two files are touched in disjoint windows chosen to expose offset
   // paging: with the old per_page shrink, commits 21-40 were replayed twice
   // and 101-120 never fetched, so a.ts doubled and b.ts vanished. A file
-  // touched in *every* commit cannot show the difference — the inflated and
-  // skipped counts cancel out — so neither of these is.
+  // touched in *every* commit cannot show the difference, because the
+  // inflated and skipped counts cancel out, so neither of these is.
   stubGitHub({
     commitFiles: (sha) => {
       const n = Number(sha.slice(3));

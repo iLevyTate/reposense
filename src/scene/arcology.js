@@ -2,7 +2,7 @@
  * The Arcology: a repository rendered as a stepped, radial megastructure.
  *
  * Layout recap (see layout.js): every node owns an angular sector, and depth
- * maps to a concentric ring. Here that becomes architecture —
+ * maps to a concentric ring. Here that becomes architecture:
  *
  *   terrace   a directory's floor, drawn across its children's ring band, so
  *             everything a folder contains literally stands on it
@@ -18,6 +18,7 @@
 
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { LIFT } from '../layout.js';
 import { hexToRgb, colorOf } from '../palette.js';
 
@@ -75,7 +76,7 @@ export class Arcology {
    * The plane the arcology stands on: a pool of light under the core, fading
    * out through faint concentric guides at each ring radius. Without it the
    * structure floats in a void; with it the whole composition is anchored,
-   * and the guides quietly restate the layout's grammar — rings are depth.
+   * and the guides quietly restate the layout's grammar: rings are depth.
    */
   #buildGround() {
     const maxR = ((this.layout.maxRing ?? 4) + 2) * this.layout.ringGap + this.layout.band;
@@ -138,7 +139,10 @@ export class Arcology {
     const files = this.layout.files;
     const count = files.length;
 
-    const geo = new THREE.BoxGeometry(1, 1, 1);
+    // A chamfered box rather than a perfect one: nothing physical has a
+    // zero-radius edge, and the bevel is what lets the fresnel catch along
+    // silhouettes the way light catches a machined corner.
+    const geo = new RoundedBoxGeometry(1, 1, 1, 1, 0.07);
     geo.translate(0, 0.5, 0); // pivot at the base so scaling grows upward
 
     const aColor = new Float32Array(count * 3);
@@ -295,9 +299,15 @@ export class Arcology {
           float lambert = max(dot(normalize(vNormalW), keyDir), 0.0);
           // The base is clamped at zero because dot() of two normalized
           // vectors can exceed 1.0 by a float ulp on real GPUs, and
-          // pow(negative, 2.4) is NaN — which the bloom blur then smears
-          // across the entire frame as white.
+          // pow(negative, 2.4) is NaN, and the bloom blur smears one NaN
+          // pixel across the entire frame as white.
           float fres = pow(max(1.0 - dot(normalize(vNormalW), normalize(vViewDir)), 0.0), 2.4);
+
+          // The body is desaturated toward its own luminance. High-end
+          // grading keeps chroma scarce and spends the pure language colour
+          // only where it reads as light: the crown, the rim, the windows.
+          float lum = dot(vColor, vec3(0.299, 0.587, 0.114));
+          vec3 body = mix(vColor, vec3(lum), 0.34);
 
           // Dark plinth fading to a lit crown. The additive light scales with
           // the tower's stature: a two-unit stub with a full crown used to
@@ -305,7 +315,7 @@ export class Arcology {
           // stubs.
           float crown = smoothstep(0.15, 1.0, vY);
           float stature = smoothstep(1.5, 9.0, vScale.y);
-          vec3 base = mix(vColor * 0.14, vColor, 0.42 + 0.44 * crown);
+          vec3 base = mix(body * 0.14, body, 0.42 + 0.44 * crown);
           vec3 col = base * (0.24 + 0.58 * lambert);
           col += vColor * fres * mix(0.07, 0.18, stature);
           col += vColor * crown * crown * mix(0.04, 0.12, stature);
@@ -313,7 +323,7 @@ export class Arcology {
           // Procedural windows on the side faces. Each face carries a grid of
           // slightly inset panes; a per-cell hash decides which are lit. This
           // is what makes a close fly-by read as an inhabited structure rather
-          // than a glowing slab — and it is a pure function of geometry and
+          // than a glowing slab. It is a pure function of geometry and
           // seed, so every frame and every renderer agrees.
           float sideness = step(abs(vNLocal.y), 0.5);
           float u = abs(vNLocal.x) > 0.5 ? (vLocal.z + 0.5) : (vLocal.x + 0.5);
@@ -321,15 +331,18 @@ export class Arcology {
           float h = vY * vScale.y;
           float cols = max(1.0, floor(faceW / 1.05));
           float rowH = 1.55;
-          vec2 cell = vec2(fract(u * cols), fract(h / rowH));
+          // Rows are staggered per building; a whole district whose windows
+          // align to one grid is the repetition the eye flags as synthetic.
+          float hh = h / rowH + vSeed * 0.83;
+          vec2 cell = vec2(fract(u * cols), fract(hh));
           float pane = step(0.2, cell.x) * step(cell.x, 0.8) * step(0.3, cell.y) * step(cell.y, 0.74);
-          vec2 id = vec2(floor(u * cols), floor(h / rowH));
+          vec2 id = vec2(floor(u * cols), floor(hh));
           float litHash = fract(sin(dot(vec3(id, vSeed * 61.7), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
           float lit = step(0.42, litHash);
           // Only towers tall enough to have storeys get windows, and the top
           // band stays clean so the crown keeps its line.
           float windows = pane * sideness * step(4.0, vScale.y) * step(0.04, vY) * (1.0 - step(0.88, vY));
-          vec3 glass = mix(vColor * 0.10, mix(vColor, vec3(1.0, 0.93, 0.78), 0.5) * 1.35, lit);
+          vec3 glass = mix(body * 0.10, mix(vColor, vec3(1.0, 0.93, 0.78), 0.55) * 1.3, lit);
           col = mix(col, glass, windows * 0.85);
 
           // Contact shading where the tower meets its terrace.
@@ -390,8 +403,8 @@ export class Arcology {
 
       // Floors are tinted toward a cool structural grey rather than painted
       // in the full language colour: a repo that is 97% one language would
-      // otherwise render as one flat sheet, and the towers — which carry the
-      // real per-file colour — would have nothing to stand out against.
+      // otherwise render as one flat sheet, and the towers, which carry the
+      // real per-file colour, would have nothing to stand out against.
       const c = mixToward(hexToRgb(colorOf(d.lang)), STRUCTURE_TINT, 0.6);
       // Deeper folders sit further out and read dimmer, which keeps the eye on
       // the trunk of the tree rather than the leaves.
@@ -761,12 +774,12 @@ export class Arcology {
       }
       // The creation flare is a pure function of the timestamp: a file glows
       // white for `flashWindow` seconds of history after it appears, then
-      // settles into its language colour. Stateless on purpose — an earlier
+      // settles into its language colour. Stateless on purpose: an earlier
       // version decayed a stored value per frame, which made the flare last
       // twice as long at 30fps as at 60 and drift between live playback and
       // offline recording. Computed from `t` alone, every path that draws a
       // frame agrees exactly, and pausing the playhead leaves the files just
-      // created still glowing — a marker of what this stretch of history added.
+      // created still glowing, a marker of what this stretch of history added.
       let flare = 0;
       if (hasHistory && f.addedAt && flashWindow > 0) {
         const age = t - f.addedAt;
@@ -818,10 +831,10 @@ export class Arcology {
 
     // Labels are real scene objects, so they need the animated lift applied.
     // Visibility is judged per label against the camera, scaled by how big this
-    // particular structure is — a fixed distance would show everything on a
+    // particular structure is; a fixed distance would show everything on a
     // small repo and nothing on a large one.
     // Label thresholds are distances, and a narrow viewport parks the camera
-    // further back (see Cinema#aspectPullback) — so the same rule has to be
+    // further back (see Cinema#aspectPullback), so the same rule has to be
     // scaled by the same factor, or a phone shows no labels at all.
     const halfV = (camera.fov * Math.PI) / 360;
     const halfH = Math.atan(Math.tan(halfV) * camera.aspect);

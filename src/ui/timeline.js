@@ -2,8 +2,8 @@
  * The Chronology scrubber.
  *
  * A repository's history is something you navigate, so the strip under the
- * playhead answers one question: where did the work happen? That is a single
- * measure — commit activity over time — drawn as bars.
+ * playhead answers one question: where did the work happen? That is a
+ * single measure, commit activity over time, drawn as bars.
  *
  * It deliberately does NOT also plot cumulative growth behind them. Commits per
  * week and total files are different scales, and putting both on one strip would
@@ -39,7 +39,7 @@ export class Timeline {
    * Buckets the payload's weekly commit counts across the scrubber's own range.
    *
    * Falls back to counting files created per bucket when a dataset carries no
-   * commit activity, and says so — the shape of the strip means something
+   * commit activity, and says so, because the shape of the strip means something
    * different then, and a chart that quietly swaps its measure is lying.
    */
   setData(model, range) {

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>RepoSense — Visualize Your Repo Cinematically</title>
-<meta name="description" content="Turn any GitHub repository into a cinematic 3D structure you can fly through. No install, no backend — paste a repo name and watch it build itself." />
+<title>RepoSense: Visualize Your Repo Cinematically</title>
+<meta name="description" content="Turn any GitHub repository into a cinematic 3D structure you can fly through. No install, no backend. Paste a repo name and watch it build itself." />
 <meta name="color-scheme" content="dark" />
 
-<meta property="og:title" content="RepoSense — Visualize Your Repo Cinematically" />
+<meta property="og:title" content="RepoSense: Visualize Your Repo Cinematically" />
 <meta property="og:description" content="Turn any GitHub repository into a cinematic 3D structure you can fly through." />
 <meta property="og:type" content="website" />
 
@@ -40,7 +40,7 @@
 
     <p class="pitch">
       Every file becomes a tower. Every folder becomes a terrace. The whole repository
-      assembles itself into a structure you can fly through — sized by bytes, coloured by
+      assembles itself into a structure you can fly through: sized by bytes, coloured by
       language, lit by how recently it changed.
     </p>
 
@@ -103,7 +103,7 @@
       <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Load a reposense.json file">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M12 15V3m0 0L8 7m4-4 4 4M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/></svg>
         <p><strong>Drop a <code>reposense.json</code></strong></p>
-        <p class="muted">Private repos, full git history, no API limits — generate one locally:</p>
+        <p class="muted">Private repos, full git history, no API limits. Generate one locally:</p>
         <code class="cmd">npx github:iLevyTate/reposense</code>
         <input type="file" id="file-input" accept=".json,application/json" hidden />
       </div>
@@ -251,17 +251,17 @@
   </ul>
   <h2>Reading the structure</h2>
   <ul class="legend-help">
-    <li><b>Ring</b> — how deep a file sits in the tree</li>
-    <li><b>Terrace</b> — a directory; everything it contains stands on it</li>
-    <li><b>Height</b> — file size, on a log scale</li>
-    <li><b>Colour</b> — language</li>
-    <li><b>Glow</b> — churn, when history is available</li>
+    <li><b>Ring</b>: how deep a file sits in the tree</li>
+    <li><b>Terrace</b>: a directory; everything it contains stands on it</li>
+    <li><b>Height</b>: file size, on a log scale</li>
+    <li><b>Colour</b>: language</li>
+    <li><b>Glow</b>: churn, when history is available</li>
   </ul>
   <h2>Chronology</h2>
   <ul class="legend-help">
-    <li><b>Bars</b> — commit activity per period; the played span is lit</li>
-    <li><b>White flare</b> — a file at the moment of its creation</li>
-    <li><b>Playhead</b> — drag it, or press <kbd>Space</kbd> to replay the history</li>
+    <li><b>Bars</b>: commit activity per period; the played span is lit</li>
+    <li><b>White flare</b>: a file at the moment of its creation</li>
+    <li><b>Playhead</b>: drag it, or press <kbd>Space</kbd> to replay the history</li>
   </ul>
   <form method="dialog"><button class="tool">Close</button></form>
 </dialog>

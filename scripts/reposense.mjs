@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * RepoSense — local repository scanner.
+ * RepoSense local repository scanner.
  *
  * Produces the same `reposense/1` document the hosted app builds from the
  * GitHub API, but from a local clone. That means no rate limits, private
@@ -80,7 +80,7 @@ function parseArgs(argv) {
 }
 
 const HELP = `
-RepoSense — turn a repository into a cinematic 3D structure.
+RepoSense: turn a repository into a cinematic 3D structure.
 
 Usage
   reposense [directory] [options]
@@ -264,7 +264,7 @@ async function collectHistory(dir, byPath, { commits, onProgress }) {
   );
 
   // Creation dates. git log walks newest-first, so the last write per path wins
-  // and that is the earliest add — exactly what the growth timeline needs.
+  // and that is the earliest add, which is exactly what the growth timeline needs.
   let addWhen = 0;
   await gitLines(
     dir,

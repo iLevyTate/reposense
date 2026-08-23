@@ -140,7 +140,7 @@ export class Constellation {
         holder,
         radius,
         phase,
-        // Bigger contributors orbit slower — visually they read as heavier.
+        // Bigger contributors orbit slower; visually they read as heavier.
         speed: 0.075 / (0.55 + share),
         tilt: (ringIndex % 2 === 0 ? 1 : -1) * (0.1 + ringIndex * 0.06),
         bob: this.bodyScale * (1.6 + ringIndex * 0.8),

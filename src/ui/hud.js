@@ -1,8 +1,9 @@
 /**
  * HUD rendering: the panels, inspector, tooltip and toasts around the canvas.
  *
- * This module owns DOM only. It never touches three.js — main.js wires the two
- * together — which keeps the renderer testable and the UI replaceable.
+ * This module owns DOM only. It never touches three.js; main.js wires the
+ * two together. That split keeps the renderer testable and the UI
+ * replaceable.
  */
 
 import { formatBytes, formatCount } from '../model.js';
@@ -78,7 +79,7 @@ export class Hud {
       .slice(0, 24)
       .map(
         (l) =>
-          `<span style="width:${(l.share * 100).toFixed(3)}%;background:${l.color}" title="${esc(l.name)} — ${pct(l.share)}"></span>`,
+          `<span style="width:${(l.share * 100).toFixed(3)}%;background:${l.color}" title="${esc(l.name)} · ${pct(l.share)}"></span>`,
       )
       .join('');
 
@@ -116,7 +117,7 @@ export class Hud {
       );
     }
     if (model.payload.repo?.truncatedTree) {
-      notes.push('GitHub truncated this repository’s file tree — it is too large to return in full.');
+      notes.push('GitHub truncated this repository’s file tree. It is too large to return in full.');
     }
     if (!s.hasChurn) {
       notes.push('No history data: run a deep scan, or generate a file with the local CLI, to light the towers by churn.');
@@ -128,7 +129,7 @@ export class Hud {
       );
     } else if (scan?.clamped) {
       notes.push(
-        `History covers the newest ${scan.commits.toLocaleString()} commits — the anonymous API allows 60 requests/hour. Add a token to replay up to 1,000, or use the local CLI for everything.`,
+        `History covers the newest ${scan.commits.toLocaleString()} commits; the anonymous API allows 60 requests an hour. Add a token to replay up to 1,000, or use the local CLI for everything.`,
       );
     }
     this.el.modelNote.hidden = notes.length === 0;
@@ -240,7 +241,7 @@ export class Hud {
 
     if (!this.animateCaptions) {
       // Every seek would otherwise restart the fade-in, and a frame captured
-      // straight afterwards catches it at opacity 0 — captions never appeared
+      // straight afterwards catches it at opacity 0. Captions never appeared
       // in a recording at all.
       this.el.caption.style.animation = 'none';
       this.el.caption.style.opacity = '1';
@@ -295,7 +296,7 @@ function highlight(path, q) {
   return `${esc(path.slice(0, i))}<span class="hl">${esc(path.slice(i, i + q.length))}</span>${esc(path.slice(i + q.length))}`;
 }
 
-/** "1 commit" / "12 commits" — counts above 999 use the compact form. */
+/** "1 commit" / "12 commits"; counts above 999 use the compact form. */
 function plural(n, word) {
   return `${formatCount(n)} ${word}${n === 1 ? '' : 's'}`;
 }

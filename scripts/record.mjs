@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Offline recorder — renders the cinematic tour to a GIF, MP4, WebM, or an
+ * Offline recorder. Renders the cinematic tour to a GIF, MP4, WebM, or an
  * animated WebP that embeds in a README.
  *
  * Frames are asked for by timestamp rather than captured in real time. That is
@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const HELP = `
-reposense-record — render the tour to a video or GIF
+reposense-record: render the tour to a video or GIF
 
 Usage
   node scripts/record.mjs --data <reposense.json> --out <file> [options]
@@ -146,7 +146,7 @@ async function encode(framePattern, out, fps) {
   if (ext === '.webp') {
     // Animated WebP is the format that belongs in a README: GitHub renders it
     // inline like a GIF, but real inter-frame compression makes the same
-    // footage roughly a tenth of the size — a GIF of this scene blows past
+    // footage roughly a tenth of the size. A GIF of this scene blows past
     // GitHub's 10 MB image cap in a few seconds.
     await run('ffmpeg', ['-y', '-framerate', String(fps), '-i', framePattern,
       '-c:v', 'libwebp_anim', '-q:v', '80', '-compression_level', '6', '-loop', '0', out]);

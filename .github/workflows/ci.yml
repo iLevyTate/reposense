@@ -4,7 +4,7 @@ on:
   pull_request:
   # Every branch, not just main. Between a merge and the next pull request a
   # branch has no open PR, so a `pull_request`-only trigger leaves that work
-  # entirely unchecked — which is exactly where these commits landed.
+  # entirely unchecked, which is exactly where these commits landed.
   push:
   workflow_dispatch:
 

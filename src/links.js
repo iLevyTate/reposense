@@ -32,7 +32,7 @@ export function encodePath(path) {
 export function githubUrlFor(repo, file) {
   if (!repo?.url || !file?.path) return '';
   // Branch names may contain slashes (`claude/some-feature`), which must stay
-  // literal for GitHub to resolve the ref — so encode segment-wise here too.
+  // literal for GitHub to resolve the ref, so encode segment-wise here too.
   const branch = encodePath(repo.branch || 'HEAD') || 'HEAD';
   if (file.bundle) {
     const dir = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : '';
