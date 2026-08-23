@@ -11,23 +11,27 @@ lit by how recently it changed.
 [**Open the visualizer →**](https://ilevytate.github.io/reposense/)
 
 <a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense">
-  <img alt="The Arcology view of RepoSense's own repository: concentric terraces stepping outward and upward, with a glowing tower on each one for every file" src="public/shots/arcology.png" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/reposense-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="public/reposense-light.svg">
+    <img alt="RepoSense's own repository rendered as an isometric city: concentric terraces stepping outward, a tower for every file, lit windows on the tall ones" src="public/reposense-dark.svg" width="100%">
+  </picture>
 </a>
 
-<sub>RepoSense rendering itself. Clicking any shot opens this repository in the live explorer.</sub>
+<sub>RepoSense rendering itself: the Action's own SVG output, following your GitHub theme. Clicking any shot opens this repository in the live explorer.</sub>
 
 <table>
   <tr>
-    <td width="50%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Chronology view: the timeline scrubber replaying the repository's history" src="public/shots/chronology.png"></a></td>
-    <td width="50%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Constellation view: contributors orbiting the districts they built" src="public/shots/constellation.png"></a></td>
+    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Arcology view in the 3D explorer: terraces and glowing towers under a graded sky" src="public/shots/arcology.png"></a></td>
+    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Chronology view: the timeline scrubber replaying the repository's history" src="public/shots/chronology.png"></a></td>
+    <td width="33%"><a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense"><img alt="The Constellation view: contributors orbiting the districts they built" src="public/shots/constellation.png"></a></td>
   </tr>
   <tr align="center">
-    <td><sub><b>Chronology</b>: scrub the git history and watch files flare as they are created</sub></td>
+    <td><sub><b>Arcology</b>: rings are depth, height is size, colour is language</sub></td>
+    <td><sub><b>Chronology</b>: scrub the git history and watch files flare in</sub></td>
     <td><sub><b>Constellation</b>: who built which part of it</sub></td>
   </tr>
 </table>
-
-<sub><b>Arcology</b> above. Rings are depth, height is size, colour is language.</sub>
 
 </div>
 
@@ -142,7 +146,7 @@ out as vector. A repository of a few thousand files lands in about 25 KB.
 | `animate` | `false` | Build the structure in on a loop (SVG) |
 | `height` | `720` | Frame height, video only |
 | `fps` | `30` | Frames per second, video only |
-| `seconds` | *(full tour)* | Video length; the whole tour runs about 48s |
+| `seconds` | *(full tour)* | Video length; the whole tour runs about 54s |
 | `chrome` | `false` | Keep the HUD visible in video |
 | `commits` | *(all)* | Cap history at the newest N commits |
 | `history` | `true` | `false` skips the git log pass entirely |

@@ -66,6 +66,7 @@ export class Arcology {
     this.#buildTerraces();
     this.#buildBridges();
     this.#buildCore();
+    this.#buildMotes();
     this.#buildLabels();
     this.#buildSelection();
   }
@@ -672,6 +673,84 @@ export class Arcology {
     core.position.y = 2;
     this.core = core;
     this.group.add(core);
+  }
+
+  /* ------------------------------------------------------------------- motes */
+
+  /**
+   * Slow dust drifting through the structure. A few hundred faint points give
+   * the air a volume for the towers to stand in, and their parallax is what
+   * sells the camera moves. Positions are seeded and the drift is a pure
+   * function of scene time, so the offline recorder stays deterministic.
+   */
+  #buildMotes() {
+    const maxR = ((this.layout.maxRing ?? 4) + 2) * this.layout.ringGap + this.layout.band;
+    const COUNT = Math.min(340, Math.max(140, Math.round(maxR * 2.2)));
+
+    let s = 0x9e3779b9;
+    const rand = () => {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+
+    const positions = new Float32Array(COUNT * 3);
+    const seeds = new Float32Array(COUNT);
+    const sizes = new Float32Array(COUNT);
+    const height = Math.max(this.layout.band * 3, this.layout.fitHeight * 1.5);
+    for (let i = 0; i < COUNT; i += 1) {
+      // sqrt keeps the disc evenly filled instead of clumped at the middle.
+      const r = Math.sqrt(rand()) * maxR * 1.25;
+      const a = rand() * Math.PI * 2;
+      positions[i * 3] = Math.cos(a) * r;
+      positions[i * 3 + 1] = rand() * height - this.layout.band * 0.2;
+      positions[i * 3 + 2] = Math.sin(a) * r;
+      seeds[i] = rand() * 100;
+      sizes[i] = 0.9 + rand() * 1.8;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.uniforms,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      vertexShader: `
+        attribute float aSeed;
+        attribute float aSize;
+        uniform float uTime;
+        uniform float uFade;
+        varying float vA;
+        void main() {
+          vec3 p = position;
+          p.x += sin(uTime * 0.09 + aSeed * 1.7) * 3.5;
+          p.y += sin(uTime * 0.06 + aSeed * 2.3) * 2.5;
+          p.z += cos(uTime * 0.08 + aSeed * 1.1) * 3.5;
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          gl_PointSize = aSize * 260.0 / max(40.0, -mv.z);
+          // Each mote breathes on its own phase; all of them obey the reveal.
+          vA = (0.5 + 0.5 * sin(uTime * 0.5 + aSeed * 3.7)) * (1.0 - uFade);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        varying float vA;
+        void main() {
+          float d = length(gl_PointCoord - 0.5) * 2.0;
+          float disc = smoothstep(1.0, 0.2, d);
+          gl_FragColor = vec4(vec3(0.62, 0.74, 0.92), disc * vA * 0.14);
+        }`,
+    });
+
+    this.motes = new THREE.Points(geo, mat);
+    this.motes.frustumCulled = false;
+    this.motes.renderOrder = -1;
+    this.group.add(this.motes);
   }
 
   /* ------------------------------------------------------------------ labels */
