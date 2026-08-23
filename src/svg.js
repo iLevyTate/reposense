@@ -48,15 +48,28 @@ const THEMES = {
     rimOpacity: 0.8,
     // Tower faces shade from a grounded base into a lit top; the pure colour
     // is reserved for the crown stroke, which is what reads as light.
-    faceTopLo: 0.34,
-    faceTopHi: 0.62,
+    faceTopLo: 0.3,
+    faceTopHi: 0.56,
     sideTint: [0.3, 0.38, 0.56],
     sideMix: 0.22,
-    rightLo: 0.2,
-    rightHi: 0.98,
-    leftLo: 0.12,
-    leftHi: 0.6,
-    crownOpacity: 0.9,
+    rightLo: 0.17,
+    rightHi: 0.8,
+    leftLo: 0.1,
+    leftHi: 0.5,
+    crownOpacity: 0.75,
+    // The premium grade: bodies desaturate toward architecture and the
+    // saturated colour survives only in rims, crowns and the legend, the same
+    // trade the WebGL scene makes.
+    desat: 0.38,
+    winFill: '#ffe3b0',
+    winLitOp: 0.9,
+    winShadeOp: 0.3,
+    shadowOp: 0.5,
+    ring: '#7fa8e8',
+    ringOp: 0.07,
+    core: '#bfeaff',
+    coreOp: 0.85,
+    pools: true,
     stars: true,
   },
   light: {
@@ -83,6 +96,17 @@ const THEMES = {
     leftLo: 0.44,
     leftHi: 0.78,
     crownOpacity: 0.9,
+    desat: 0.22,
+    // On white the windows read as dark glass rather than lit panes.
+    winFill: '#31415c',
+    winLitOp: 0.28,
+    winShadeOp: 0.15,
+    shadowOp: 0.16,
+    ring: '#5a7ab0',
+    ringOp: 0.1,
+    core: '#7fb4d9',
+    coreOp: 0.5,
+    pools: false,
     stars: false,
   },
 };
@@ -129,11 +153,17 @@ function mulberry32(seed) {
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-function shade(hex, factor, tint = null, mix = 0) {
+function shade(hex, factor, tint = null, mix = 0, desat = 0) {
   const v = parseInt(hex.slice(1), 16);
   let r = (v >> 16) & 255;
   let g = (v >> 8) & 255;
   let b = v & 255;
+  if (desat) {
+    const lum = r * 0.2126 + g * 0.7152 + b * 0.0722;
+    r += (lum - r) * desat;
+    g += (lum - g) * desat;
+    b += (lum - b) * desat;
+  }
   if (tint) {
     r = r * (1 - mix) + tint[0] * 255 * mix;
     g = g * (1 - mix) + tint[1] * 255 * mix;
@@ -228,6 +258,9 @@ export function renderSvg(payload, opts = {}) {
         `<g${cls}>` +
         `<path d="${skirtPath}" fill="${skirtFill}"/>` +
         `<path d="${path}" fill="${floor}" fill-opacity="${theme.terraceAlpha}"/>` +
+        // Two passes make the rim glow: a wide soft halo under a thin core,
+        // which is what bloom does to the same edge in the WebGL scene.
+        `<path d="${rimPath}" fill="none" stroke="${color}" stroke-opacity="${n(0.16 * fade)}" stroke-width="${n(Math.max(2, layout.band * 0.14))}" stroke-linecap="round"/>` +
         `<path d="${rimPath}" fill="none" stroke="${color}" stroke-opacity="${n(theme.rimOpacity * fade)}" stroke-width="${n(Math.max(0.7, layout.band * 0.035))}" stroke-linecap="round"/>` +
         `</g>`,
     });
@@ -248,6 +281,11 @@ export function renderSvg(payload, opts = {}) {
     }
     return id;
   };
+
+  // Per-tower window brightness; seeded so every render is byte-identical.
+  const trand = mulberry32(0x70e35eed);
+  // Only buildings tall enough to have floors get windows.
+  const WIN_MIN_H = layout.ringGap * 0.7;
 
   for (const f of layout.files) {
     const y0 = f.ring * LIFT;
@@ -278,13 +316,49 @@ export function renderSvg(payload, opts = {}) {
       `<polygon points="${poly([iso(cx + w, y0, cz - w), iso(cx + w, y1, cz - w), iso(cx + w, y1, cz + w), iso(cx + w, y0, cz + w)])}" fill="url(#fr${gid})"/>`,
       // Left face: the +z edge, in shadow.
       `<polygon points="${poly([iso(cx - w, y0, cz + w), iso(cx - w, y1, cz + w), iso(cx + w, y1, cz + w), iso(cx + w, y0, cz + w)])}" fill="url(#fl${gid})"/>`,
-      // Top face, ringed by the crown light.
-      `<polygon points="${poly(top)}" fill="url(#ft${gid})" stroke="${color}" stroke-opacity="${n(theme.crownOpacity * fade)}" stroke-width="${n(Math.min(1.1, w * 0.4))}" stroke-linejoin="round"/>`,
     ];
 
-    const body = `<g${animate ? ` class="r${Math.min(f.ring, RING_CLASSES - 1)}"` : ''}${fade < 0.98 ? ` opacity="${n(fade)}"` : ''}>${faces.join('')}</g>`;
+    // Window grids on both visible faces, inset from the edges. The panes
+    // come from two shared skewed patterns, so a thousand towers cost two
+    // defs and one polygon per face.
+    const lit = 0.55 + trand() * 0.45;
+    if (f.height >= WIN_MIN_H) {
+      const wz0 = cz - w * 0.66;
+      const wz1 = cz + w * 0.66;
+      const wx0 = cx - w * 0.66;
+      const wx1 = cx + w * 0.66;
+      const wy0 = y0 + 0.7;
+      const wy1 = y1 - 1.1;
+      faces.push(
+        `<polygon points="${poly([iso(cx + w, wy0, wz0), iso(cx + w, wy1, wz0), iso(cx + w, wy1, wz1), iso(cx + w, wy0, wz1)])}" fill="url(#wr)" opacity="${n(theme.winLitOp * lit)}"/>`,
+        `<polygon points="${poly([iso(wx0, wy0, cz + w), iso(wx0, wy1, cz + w), iso(wx1, wy1, cz + w), iso(wx1, wy0, cz + w)])}" fill="url(#wl)" opacity="${n(theme.winShadeOp * lit)}"/>`,
+      );
+    }
+    // Top face last, ringed by the crown light.
+    faces.push(
+      `<polygon points="${poly(top)}" fill="url(#ft${gid})" stroke="${color}" stroke-opacity="${n(theme.crownOpacity * fade)}" stroke-width="${n(Math.min(0.8, w * 0.22))}" stroke-linejoin="round"/>`,
+    );
+
+    const cls = animate ? ` class="r${Math.min(f.ring, RING_CLASSES - 1)}"` : '';
+    // The contact shadow is what sets a building down on its terrace instead
+    // of floating it a millimetre above; it sorts just behind its tower.
+    const base = iso(cx, y0, cz);
+    const shR = w * 1.7 * Math.SQRT2;
+    shapes.push({
+      depth: depth - 0.01,
+      svg: `<g${cls}><ellipse cx="${n(base.x)}" cy="${n(base.y)}" rx="${n(shR * COS30)}" ry="${n(shR * SIN30)}" fill="url(#sh)" opacity="${n(theme.shadowOp * fade)}"/></g>`,
+    });
+
+    const body = `<g${cls}${fade < 0.98 ? ` opacity="${n(fade)}"` : ''}>${faces.join('')}</g>`;
     shapes.push({ depth, svg: body });
   }
+
+  // The core: a glowing orb in the centre well, where the WebGL scene keeps
+  // its own. It sorts above every floor and behind every tower.
+  shapes.push({
+    depth: -1e5,
+    svg: `<circle cx="0" cy="${n(-LIFT * 0.55)}" r="${n(layout.ringGap * 0.55)}" fill="url(#core)"/>`,
+  });
 
   shapes.sort((a, b) => a.depth - b.depth);
 
@@ -346,26 +420,33 @@ export function renderSvg(payload, opts = {}) {
     ].join('  ·  ');
 
     // The spectrum: language shares as one segmented bar, gaps included.
-    const langs = model.languages.slice(0, 12);
-    const shown = langs.reduce((t, l) => t + l.share, 0) || 1;
+    // Shares below one percent fold into a single muted tail segment; a row
+    // of crumb-sized dots communicates nothing but clutter.
+    const langs = model.languages.slice(0, 12).filter((l) => l.share >= 0.01);
+    const tail = Math.max(0, 1 - langs.reduce((t, l) => t + l.share, 0));
+    const segs2 = langs.length + (tail >= 0.005 ? 1 : 0);
     const barY = maxY + legendH * 0.62;
     const barH = unit * 0.55;
     const gap = unit * 0.18;
-    const barW = right - left - gap * Math.max(0, langs.length - 1);
+    const barW = right - left - gap * Math.max(0, segs2 - 1);
     let bx = left;
     let bar = '';
     for (const l of langs) {
-      const w = Math.max(unit * 0.3, (l.share / shown) * barW);
+      const w = Math.max(unit * 0.3, l.share * barW);
       if (bx + w > right + 0.5) break;
       bar += `<rect x="${n(bx)}" y="${n(barY)}" width="${n(w)}" height="${n(barH)}" rx="${n(barH / 2)}" fill="${l.color}"/>`;
       bx += w + gap;
+    }
+    if (tail >= 0.005 && bx + unit * 0.3 <= right + 0.5) {
+      const w = Math.min(right - bx, Math.max(unit * 0.3, tail * barW));
+      bar += `<rect x="${n(bx)}" y="${n(barY)}" width="${n(w)}" height="${n(barH)}" rx="${n(barH / 2)}" fill="${theme.faint}" fill-opacity="0.4"/>`;
     }
 
     // The key: dot, name, share, laid out until the row runs out of width.
     const keyY = barY + unit * 2.1;
     let kx = left;
     let key = '';
-    for (const l of langs.slice(0, 8)) {
+    for (const l of model.languages.slice(0, 8)) {
       const label = `${l.name} ${(l.share * 100).toFixed(l.share >= 0.1 ? 0 : 1)}%`;
       const kw = unit * (2.1 + label.length * 1.7 * 0.62);
       if (kx + kw > right) break;
@@ -391,13 +472,44 @@ export function renderSvg(payload, opts = {}) {
   for (const [color, gid] of grads) {
     const g = (id, lo, hi, tint, mix) =>
       `<linearGradient id="${id}${gid}" x1="0" y1="1" x2="0" y2="0">` +
-      `<stop offset="0%" stop-color="${shade(color, lo, tint, mix)}"/>` +
-      `<stop offset="100%" stop-color="${shade(color, hi, tint, mix * 0.5)}"/>` +
+      `<stop offset="0%" stop-color="${shade(color, lo, tint, mix, theme.desat)}"/>` +
+      `<stop offset="100%" stop-color="${shade(color, hi, tint, mix * 0.5, theme.desat)}"/>` +
       `</linearGradient>`;
     gradDefs +=
       g('fr', theme.rightLo, theme.rightHi, theme.sideTint, theme.sideMix) +
       g('fl', theme.leftLo, theme.leftHi, theme.sideTint, theme.sideMix) +
       g('ft', theme.faceTopLo, theme.faceTopHi, theme.sideTint, theme.sideMix * 0.4);
+  }
+  // Shared scene defs: the contact-shadow falloff, the core glow, and the two
+  // window grids. The pattern skews match the 30 degree isometric slope, so
+  // the panes follow each face's floors exactly.
+  gradDefs +=
+    `<radialGradient id="sh">` +
+    `<stop offset="0%" stop-color="#000" stop-opacity=".55"/>` +
+    `<stop offset="65%" stop-color="#000" stop-opacity=".22"/>` +
+    `<stop offset="100%" stop-color="#000" stop-opacity="0"/>` +
+    `</radialGradient>` +
+    `<radialGradient id="core">` +
+    `<stop offset="0%" stop-color="${theme.core}" stop-opacity="${n(theme.coreOp)}"/>` +
+    `<stop offset="40%" stop-color="${theme.core}" stop-opacity="${n(theme.coreOp * 0.3)}"/>` +
+    `<stop offset="100%" stop-color="${theme.core}" stop-opacity="0"/>` +
+    `</radialGradient>` +
+    `<pattern id="wr" width="1.35" height="1.8" patternUnits="userSpaceOnUse" patternTransform="skewY(-30)">` +
+    `<rect x="0.3" y="0.4" width="0.72" height="1.02" rx="0.14" fill="${theme.winFill}"/>` +
+    `</pattern>` +
+    `<pattern id="wl" width="1.35" height="1.8" patternUnits="userSpaceOnUse" patternTransform="skewY(30)">` +
+    `<rect x="0.3" y="0.4" width="0.72" height="1.02" rx="0.14" fill="${theme.winFill}"/>` +
+    `</pattern>`;
+  if (theme.pools) {
+    gradDefs +=
+      `<radialGradient id="poolc">` +
+      `<stop offset="0%" stop-color="#4fd8ff" stop-opacity=".08"/>` +
+      `<stop offset="100%" stop-color="#4fd8ff" stop-opacity="0"/>` +
+      `</radialGradient>` +
+      `<radialGradient id="poolv">` +
+      `<stop offset="0%" stop-color="#8f6bff" stop-opacity=".07"/>` +
+      `<stop offset="100%" stop-color="#8f6bff" stop-opacity="0"/>` +
+      `</radialGradient>`;
   }
 
   /* ── star field: sparse, seeded, and identical on every render ────────── */
@@ -423,6 +535,31 @@ export function renderSvg(payload, opts = {}) {
   const glowCY = maxY - (maxY - minY) * 0.16;
   const glowRX = (maxX - minX) * 0.36;
 
+  // Concentric ground guides, the quiet survey lines the WebGL floor draws.
+  // Projected circles at y=0 come out as plain axis-aligned ellipses.
+  let ground = '';
+  {
+    const ringsN = (layout.maxRing ?? 4) + 2;
+    let rr = '';
+    for (let k = 1; k <= ringsN; k += 1) {
+      const r = k * layout.ringGap + layout.band * 0.5;
+      rr +=
+        `<ellipse cx="0" cy="0" rx="${n(Math.SQRT2 * r * COS30)}" ry="${n(Math.SQRT2 * r * SIN30)}"` +
+        ` fill="none" stroke="${theme.ring}" stroke-opacity="${n(theme.ringOp)}" stroke-width="${n(vbW * 0.0009)}"/>`;
+    }
+    ground = `<g>${rr}</g>`;
+  }
+
+  // Two faint colour pools give the void an atmosphere, matching the graded
+  // sky dome in the viewer: cool cyan low on one side, violet on the other.
+  let pools = '';
+  if (theme.pools) {
+    const drawnHNow = maxY - minY;
+    pools =
+      `<ellipse cx="${n(minX + vbW * 0.2)}" cy="${n(maxY - drawnHNow * 0.12)}" rx="${n(vbW * 0.36)}" ry="${n(drawnHNow * 0.5)}" fill="url(#poolc)"/>` +
+      `<ellipse cx="${n(maxX - vbW * 0.18)}" cy="${n(minY + drawnHNow * 0.14)}" rx="${n(vbW * 0.33)}" ry="${n(drawnHNow * 0.5)}" fill="url(#poolv)"/>`;
+  }
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${n(minX)} ${n(minY)} ${n(vbW)} ${n(vbH)}" role="img" aria-label="${esc(describe(payload, model))}">
 <title>${esc(describe(payload, model))}</title>
 <defs>
@@ -436,8 +573,9 @@ ${gradDefs}
 </defs>
 ${animate ? animationCss((maxY - minY) * 0.06) : ''}
 <rect x="${n(minX)}" y="${n(minY)}" width="${n(vbW)}" height="${n(vbH)}" fill="url(#bg)"/>
-${stars}
+${pools}${stars}
 <ellipse cx="${n(glowCX)}" cy="${n(glowCY)}" rx="${n(glowRX)}" ry="${n(glowRX * 0.32)}" fill="url(#haze)"/>
+${ground}
 ${shapes.map((s) => s.svg).join('')}
 ${legend}
 </svg>
