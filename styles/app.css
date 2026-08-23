@@ -213,7 +213,10 @@ code, kbd, .mono { font-family: var(--mono); }
 /* ──────────────────────────────── viewer ───────────────────────────────── */
 .viewer { position: fixed; inset: 0; }
 .stage { position: absolute; inset: 0; }
-.stage canvas { display: block; width: 100%; height: 100%; }
+/* touch-action keeps one-finger orbit and two-finger pinch with the camera
+   instead of scrolling or zooming the page (OrbitControls sets it inline too;
+   this covers the frame before it attaches). */
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .labels > * { pointer-events: none; }
 
@@ -432,6 +435,9 @@ code, kbd, .mono { font-family: var(--mono); }
 .time-read { display: grid; line-height: 1.25; min-width: 128px; }
 .time-read strong { font-family: var(--mono); font-size: 12px; }
 .time-read span { font-size: 10px; color: var(--text-faint); }
+/* What the bars measure and how much history is behind them — a chart whose
+   units are guessable is not explained. */
+.time-measure { letter-spacing: 0.02em; opacity: 0.85; }
 
 .tool {
   display: inline-flex; align-items: center; gap: 6px;
@@ -562,14 +568,33 @@ kbd {
 
   .panel-right { display: none; }
   .repo-stats { display: none; }
-  .dock { bottom: 12px; gap: 7px; }
+  /* Home-indicator phones: keep the dock above the gesture bar. */
+  .dock { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); gap: 7px; }
   .mode { padding: 7px 11px; font-size: 12px; }
   .mode-key { display: none; }
   .tool span { display: none; }
   .tool { padding: 8px 10px; }
   #help-button span { display: inline; }
   .caption h2 { font-size: 24px; }
+  /* The caption's desktop scrim padding is wider than a phone. */
+  .caption { padding: 16px 22px; max-width: calc(100vw - 24px); }
   .timeline { order: -1; width: 100%; justify-content: center; }
+  /* Let the activity strip take whatever width the row has, instead of the
+     fixed desktop clamp leaving it a stub next to the readout. */
+  .time-track { width: auto; flex: 1; min-width: 110px; }
+  .time-read { min-width: 0; }
+  .help { max-width: min(420px, calc(100vw - 32px)); max-height: 86vh; overflow-y: auto; }
+  .toast { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); max-width: calc(100vw - 32px); text-align: center; }
+}
+
+@media (max-width: 560px) {
+  .repo-desc { display: none; }
+  .topbar { padding: 10px 12px; }
+  .repo-name { font-size: 14px; }
+  .time-measure { display: none; }
+  .time-read span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 34vw; }
+  .caption h2 { font-size: 20px; letter-spacing: 0.09em; }
+  .caption p { font-size: 11px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

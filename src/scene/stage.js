@@ -4,6 +4,13 @@
  * Everything visual in RepoSense leans on the bloom pass — emissive materials
  * are authored deliberately "too bright" so the bloom threshold picks them up
  * and turns them into light sources rather than lit surfaces.
+ *
+ * The whole pipeline runs in HDR: scene → multisampled half-float target →
+ * bloom → ACES tone mapping in the output pass. The multisampling matters
+ * because post-processing bypasses the canvas's own antialiasing — the
+ * `antialias: true` on the renderer only covers the default framebuffer, so
+ * without MSAA on the composer's target every edge in the scene goes jagged
+ * the moment the composer takes over.
  */
 
 import * as THREE from 'three';
@@ -55,7 +62,15 @@ export class Stage {
     this.starfield = this.#buildStarfield();
     this.scene.add(this.starfield);
 
-    this.composer = new EffectComposer(this.renderer);
+    // A multisampled HDR target for the composer (see the header comment).
+    // WebGL2 resolves the samples automatically when a pass samples the
+    // texture; on a WebGL1 fallback `samples` is ignored and rendering still
+    // works, just without the smoothing.
+    const composeTarget = new THREE.WebGLRenderTarget(1, 1, {
+      type: THREE.HalfFloatType,
+      samples: this.renderer.capabilities.isWebGL2 ? 4 : 0,
+    });
+    this.composer = new EffectComposer(this.renderer, composeTarget);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     // strength / radius / threshold — the threshold is deliberately high so only
     // emissive crowns and rim strips bloom, not every lit surface.
@@ -63,9 +78,55 @@ export class Stage {
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
 
+    // Adaptive resolution. The ceiling is the device's own pixel ratio (capped
+    // at 2); a sustained slow frame rate steps the render scale down, and a
+    // sustained fast one steps it back up. Phones and 5K displays land on the
+    // density they can actually sustain instead of janking at full DPR.
+    this.maxPixelRatio = Math.min(devicePixelRatio || 1, 2);
+    this.renderScale = 1;
+    this._slowFrames = 0;
+    this._fastFrames = 0;
+    this._scaleCooldown = 0;
+
     this._onResize = () => this.resize();
     addEventListener('resize', this._onResize);
     this.resize();
+  }
+
+  #applyPixelRatio() {
+    const ratio = Math.max(0.75, this.maxPixelRatio * this.renderScale);
+    this.renderer.setPixelRatio(ratio);
+    this.composer.setPixelRatio(ratio);
+    this.starfield.userData.material.uniforms.uPixelRatio.value = ratio;
+    this.resize();
+  }
+
+  /**
+   * One step of the adaptive-resolution controller, fed each frame's delta.
+   * Hysteresis on both sides (45 slow frames down, 240 fast frames up, with a
+   * cooldown after every change) keeps it from oscillating on a machine that
+   * hovers near a threshold.
+   */
+  #adaptQuality(dt, time) {
+    if (time < this._scaleCooldown) return;
+    if (dt > 1 / 24) {
+      this._slowFrames += 1;
+      this._fastFrames = 0;
+    } else if (dt < 1 / 50) {
+      this._fastFrames += 1;
+      this._slowFrames = 0;
+    }
+    if (this._slowFrames > 45 && this.renderScale > 0.5) {
+      this.renderScale = Math.max(0.5, this.renderScale * 0.8);
+      this.#applyPixelRatio();
+      this._slowFrames = 0;
+      this._scaleCooldown = time + 1.5;
+    } else if (this._fastFrames > 240 && this.renderScale < 1) {
+      this.renderScale = Math.min(1, this.renderScale / 0.8);
+      this.#applyPixelRatio();
+      this._fastFrames = 0;
+      this._scaleCooldown = time + 1.5;
+    }
   }
 
   #buildStarfield() {
@@ -163,6 +224,7 @@ export class Stage {
       this.controls.update();
       this.composer.render();
       this.labelRenderer.render(this.scene, this.camera);
+      this.#adaptQuality(dt, t);
     };
     loop();
   }
@@ -190,11 +252,10 @@ export class Stage {
   setQuality(level) {
     // 'high' | 'balanced' | 'performance'
     const ratios = { high: 2, balanced: 1.5, performance: 1 };
-    const ratio = Math.min(devicePixelRatio || 1, ratios[level] ?? 1.5);
-    this.renderer.setPixelRatio(ratio);
-    this.starfield.userData.material.uniforms.uPixelRatio.value = ratio;
+    this.maxPixelRatio = Math.min(devicePixelRatio || 1, ratios[level] ?? 1.5);
+    this.renderScale = 1;
     this.bloom.enabled = level !== 'performance';
-    this.resize();
+    this.#applyPixelRatio();
   }
 
   dispose() {

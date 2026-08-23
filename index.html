@@ -76,16 +76,16 @@
         </summary>
         <div class="options-body">
           <label class="opt">
-            <input type="checkbox" id="deep-scan" />
+            <input type="checkbox" id="deep-scan" checked />
             <span>
               <strong>Deep history scan</strong>
-              <em>Opens recent commits to recover per-file churn and a real growth timeline. Costs one API request per commit.</em>
+              <em>Replays recent commits to recover per-file churn and a real growth timeline, at one API request per commit. On by default; without a token it stops at 40 commits to stay inside the anonymous rate limit.</em>
             </span>
           </label>
-          <label class="opt opt-range" id="deep-count-row" hidden>
+          <label class="opt opt-range" id="deep-count-row">
             <span><strong>Commits to replay</strong></span>
-            <input type="range" id="deep-count" min="30" max="300" step="10" value="120" />
-            <output id="deep-count-out">120</output>
+            <input type="range" id="deep-count" min="30" max="1000" step="10" value="250" />
+            <output id="deep-count-out">250</output>
           </label>
           <label class="opt opt-token">
             <span>
@@ -199,12 +199,13 @@
       <div class="time-read">
         <strong id="time-date">—</strong>
         <span id="time-detail"></span>
+        <span class="time-measure" id="time-measure"></span>
       </div>
     </div>
 
     <div class="tools">
       <button class="tool" id="tour-button" title="Play the cinematic tour (T)"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M5 3l8 5-8 5V3z"/></svg><span>Tour</span></button>
-      <button class="tool" id="record-button" title="Record a WebM video (R)"><span class="rec-dot"></span><span>Record</span></button>
+      <button class="tool" id="record-button" title="Record a video (R)"><span class="rec-dot"></span><span>Record</span></button>
       <button class="tool" id="shot-button" title="Save a PNG (P)"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" d="M2 5.5h3L6 4h4l1 1.5h3v7H2z"/><circle cx="8" cy="9" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>Snapshot</span></button>
       <button class="tool" id="export-button" title="Download the underlying data as JSON"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 2v8m0 0L5 7m3 3 3-3M3 12v2h10v-2"/></svg><span>Data</span></button>
       <button class="tool" id="help-button" title="Keyboard shortcuts (?)">?</button>
@@ -255,6 +256,12 @@
     <li><b>Height</b> — file size, on a log scale</li>
     <li><b>Colour</b> — language</li>
     <li><b>Glow</b> — churn, when history is available</li>
+  </ul>
+  <h2>Chronology</h2>
+  <ul class="legend-help">
+    <li><b>Bars</b> — commit activity per period; the played span is lit</li>
+    <li><b>White flare</b> — a file at the moment of its creation</li>
+    <li><b>Playhead</b> — drag it, or press <kbd>Space</kbd> to replay the history</li>
   </ul>
   <form method="dialog"><button class="tool">Close</button></form>
 </dialog>

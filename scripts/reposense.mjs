@@ -361,7 +361,9 @@ async function buildPayload(opts, log) {
     activity: history
       ? [...history.activity.entries()].sort((a, b) => a[0] - b[0]).map(([week, commits]) => ({ week, commits }))
       : [],
-    scan: history ? { commits: history.commitCount, source: 'git log' } : null,
+    scan: history
+      ? { commits: history.commitCount, source: 'git log', limited: Number.isFinite(opts.commits) }
+      : null,
     files,
   };
 }
