@@ -11,14 +11,10 @@ how recently it changed.
 [**Open the visualizer →**](https://ilevytate.github.io/reposense/)
 
 <a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="public/reposense-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="public/reposense-light.svg">
-    <img alt="RepoSense rendering its own repository as an isometric structure: concentric terraces stepping outward and upward, with a tower standing on each one for every file" src="public/reposense-dark.svg" width="100%">
-  </picture>
+  <img alt="Seventeen seconds of the cinematic tour over RepoSense's own repository: the camera sweeps across concentric terraces of glowing towers while captions name each movement" src="public/reposense-tour.webp" width="100%">
 </a>
 
-<sub>RepoSense rendering itself — it builds in on a loop, and clicking it opens the same repository in the live explorer.<br>Regenerated on every push by <a href=".github/workflows/visualize.yml">one workflow</a>. See <a href="#put-it-in-your-readme">Put it in your README</a>.</sub>
+<sub>The cinematic tour, flying over this repository — clicking it opens the same flight live in your browser.<br>Rendered by the same pipeline the <a href="#3-the-action">Action</a> uses to export a GIF or MP4 of <em>your</em> repository. See <a href="#put-it-in-your-readme">Put it in your README</a>.</sub>
 
 </div>
 
@@ -149,7 +145,7 @@ steps). `svg` remains as an alias for `output`.
 ### Video and GIF
 
 The `output` extension picks the format. `.svg` needs nothing installed; `.gif`,
-`.mp4` and `.webm` render the full cinematic tour through a headless browser and
+`.mp4`, `.webm` and `.webp` render the full cinematic tour through a headless browser and
 encode it with ffmpeg, both of which the action installs into its own directory
 when asked for.
 
@@ -184,6 +180,23 @@ them for release notes, issues, and social posts, and link to them from the
 README.
 
 ### Put it in your README
+
+Two things embed well. The **animated SVG** is a few dozen kilobytes, refreshes
+itself on every push, and its motion is CSS inside the image so it plays where
+scripts are stripped:
+
+<a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/reposense-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="public/reposense-light.svg">
+    <img alt="RepoSense rendering its own repository as an isometric structure: concentric terraces stepping outward and upward, with a tower standing on each one for every file" src="public/reposense-dark.svg" width="100%">
+  </picture>
+</a>
+
+The **tour footage** at the top of this README is the second kind: point the
+Action's `output` at a `.webp` (animated, and about a tenth the bytes of the
+same footage as a GIF — this page's is 6.6 MB) and it records the same
+cinematic pass over your repository.
 
 ```markdown
 ![Repository structure](reposense.svg)
@@ -336,7 +349,7 @@ src/
     cinema.js         scripted camera tour, WebM recorder
   ui/hud.js           panels, inspector, tooltip, toasts
 scripts/reposense.mjs the local scanner (zero dependencies)
-scripts/record.mjs    offline recorder: tour -> gif / mp4 / webm
+scripts/record.mjs    offline recorder: tour -> gif / mp4 / webm / webp
 action.yml            the GitHub Action
 vendor/three/         three.js, vendored so there is no CDN dependency
 ```

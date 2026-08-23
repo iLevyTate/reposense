@@ -14,14 +14,14 @@ inputs:
   output:
     description: >-
       Where to write the result, relative to the workspace. The extension picks
-      the format: .svg, .gif, .mp4 or .webm.
+      the format: .svg, .gif, .mp4, .webm or .webp (animated — the README-embeddable one).
     required: false
     default: reposense.svg
   seconds:
     description: >-
       Video length. Defaults to the full cinematic tour (~48s). Only used for
-      gif/mp4/webm. A GIF of more than a few seconds gets large fast — prefer
-      mp4 or webm for anything long.
+      gif/mp4/webm/webp. A GIF of more than a few seconds gets large fast —
+      prefer webp for a README embed and mp4/webm for anything else long.
     required: false
     default: ''
   fps:
@@ -83,7 +83,7 @@ outputs:
     description: Path to the rendered file.
     value: ${{ steps.render.outputs.output }}
   format:
-    description: 'svg, gif, mp4 or webm — taken from the output extension.'
+    description: 'svg, gif, mp4, webm or webp — taken from the output extension.'
     value: ${{ steps.render.outputs.format }}
   svg:
     description: Deprecated alias for `output`.
@@ -124,8 +124,8 @@ runs:
 
         format="${RS_OUTPUT##*.}"
         case "$format" in
-          svg|gif|mp4|webm) ;;
-          *) echo "::error::output must end in .svg, .gif, .mp4 or .webm (got .$format)"; exit 1 ;;
+          svg|gif|mp4|webm|webp) ;;
+          *) echo "::error::output must end in .svg, .gif, .mp4, .webm or .webp (got .$format)"; exit 1 ;;
         esac
 
         json_path="$RS_JSON"
