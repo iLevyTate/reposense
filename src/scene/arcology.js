@@ -60,12 +60,76 @@ export class Arcology {
     this.fileByInstance = layout.files;
     this.instanceByPath = new Map(layout.files.map((f, i) => [f.path, i]));
 
+    this.#buildGround();
     this.#buildTowers();
     this.#buildTerraces();
     this.#buildBridges();
     this.#buildCore();
     this.#buildLabels();
     this.#buildSelection();
+  }
+
+  /* ------------------------------------------------------------------ ground */
+
+  /**
+   * The plane the arcology stands on: a pool of light under the core, fading
+   * out through faint concentric guides at each ring radius. Without it the
+   * structure floats in a void; with it the whole composition is anchored,
+   * and the guides quietly restate the layout's grammar — rings are depth.
+   */
+  #buildGround() {
+    const maxR = ((this.layout.maxRing ?? 4) + 2) * this.layout.ringGap + this.layout.band;
+    const R = maxR * 2.1;
+    const geo = new THREE.CircleGeometry(R, 96);
+    geo.rotateX(-Math.PI / 2);
+
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        ...this.uniforms,
+        uRingGap: { value: this.layout.ringGap },
+        uMaxR: { value: maxR },
+      },
+      transparent: true,
+      depthWrite: false,
+      vertexShader: `
+        varying vec2 vXZ;
+        varying float vDist;
+        void main() {
+          vXZ = position.xz;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vDist = length(mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform float uFade;
+        uniform float uRingGap;
+        uniform float uMaxR;
+        uniform vec3 uFogColor;
+        uniform float uFogDensity;
+        varying vec2 vXZ;
+        varying float vDist;
+        void main() {
+          float r = length(vXZ);
+          // Light pooled under the core, dying away with radius.
+          float pool = exp(-pow(r / (uMaxR * 0.6), 2.0));
+          vec3 col = mix(vec3(0.006, 0.01, 0.026), vec3(0.045, 0.085, 0.165), pool);
+          // Concentric guides at the ring radii, strongest near the middle.
+          float band = abs(fract(r / uRingGap + 0.5) - 0.5) * uRingGap;
+          float line = smoothstep(0.8, 0.0, band) * smoothstep(uMaxR * 1.7, uMaxR * 0.25, r);
+          col += vec3(0.24, 0.38, 0.62) * line * 0.055;
+          float fog = 1.0 - exp(-vDist * vDist * uFogDensity);
+          col = mix(col, uFogColor, fog * 0.7);
+          // The disc dissolves at its rim and follows the build-in reveal.
+          float alpha = smoothstep(uMaxR * 2.05, uMaxR * 1.1, r) * (1.0 - uFade);
+          gl_FragColor = vec4(col, alpha * 0.9);
+        }`,
+    });
+
+    this.ground = new THREE.Mesh(geo, mat);
+    this.ground.position.y = -this.layout.band * 0.26;
+    this.ground.renderOrder = -2;
+    this.ground.frustumCulled = false;
+    this.group.add(this.ground);
   }
 
   /* ------------------------------------------------------------------ towers */
@@ -235,12 +299,16 @@ export class Arcology {
           // across the entire frame as white.
           float fres = pow(max(1.0 - dot(normalize(vNormalW), normalize(vViewDir)), 0.0), 2.4);
 
-          // Dark plinth fading to a lit crown.
+          // Dark plinth fading to a lit crown. The additive light scales with
+          // the tower's stature: a two-unit stub with a full crown used to
+          // bloom into a featureless white lump, and a repository is mostly
+          // stubs.
           float crown = smoothstep(0.15, 1.0, vY);
+          float stature = smoothstep(1.5, 9.0, vScale.y);
           vec3 base = mix(vColor * 0.14, vColor, 0.42 + 0.44 * crown);
           vec3 col = base * (0.24 + 0.58 * lambert);
-          col += vColor * fres * 0.18;
-          col += vColor * crown * crown * 0.12;
+          col += vColor * fres * mix(0.07, 0.18, stature);
+          col += vColor * crown * crown * mix(0.04, 0.12, stature);
 
           // Procedural windows on the side faces. Each face carries a grid of
           // slightly inset panes; a per-cell hash decides which are lit. This
