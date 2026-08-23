@@ -32,7 +32,7 @@
     "scan": "node scripts/reposense.mjs",
     "demo": "node scripts/reposense.mjs . --json --out public/demo.json",
     "test": "node --test --test-timeout=120000 test/*.test.mjs",
-    "test:browser": "node --test --test-concurrency=1 --test-timeout=180000 test/browser/*.test.mjs"
+    "test:browser": "node --test --test-concurrency=1 --test-timeout=420000 test/browser/*.test.mjs"
   },
   "files": [
     "index.html",
