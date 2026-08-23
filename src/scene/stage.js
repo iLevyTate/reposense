@@ -5,12 +5,18 @@
  * are authored deliberately "too bright" so the bloom threshold picks them up
  * and turns them into light sources rather than lit surfaces.
  *
- * The whole pipeline runs in HDR: scene → multisampled half-float target →
- * bloom → ACES tone mapping in the output pass. The multisampling matters
- * because post-processing bypasses the canvas's own antialiasing — the
- * `antialias: true` on the renderer only covers the default framebuffer, so
- * without MSAA on the composer's target every edge in the scene goes jagged
- * the moment the composer takes over.
+ * The whole pipeline runs in HDR: scene → half-float target → bloom → ACES
+ * tone mapping → FXAA. The FXAA pass exists because post-processing bypasses
+ * the canvas's own antialiasing — `antialias: true` on the renderer only
+ * covers the default framebuffer, so without it every edge goes jagged the
+ * moment the composer takes over. It is deliberately FXAA rather than a
+ * multisampled render target: resolving MSAA on a half-float target is where
+ * real-world drivers break — an ANGLE/D3D machine shipped a build of that and
+ * rendered every repository as a solid white wash while the software
+ * rasteriser in CI drew it perfectly. FXAA is one fragment shader sampling
+ * one texture; there is nothing driver-specific left to go wrong. It runs
+ * after tone mapping, on gamma-encoded output, which is where FXAA's own
+ * luminance heuristics expect to work.
  */
 
 import * as THREE from 'three';
@@ -19,6 +25,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 export class Stage {
@@ -62,21 +70,17 @@ export class Stage {
     this.starfield = this.#buildStarfield();
     this.scene.add(this.starfield);
 
-    // A multisampled HDR target for the composer (see the header comment).
-    // WebGL2 resolves the samples automatically when a pass samples the
-    // texture; on a WebGL1 fallback `samples` is ignored and rendering still
-    // works, just without the smoothing.
-    const composeTarget = new THREE.WebGLRenderTarget(1, 1, {
-      type: THREE.HalfFloatType,
-      samples: this.renderer.capabilities.isWebGL2 ? 4 : 0,
-    });
-    this.composer = new EffectComposer(this.renderer, composeTarget);
+    this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     // strength / radius / threshold — the threshold is deliberately high so only
     // emissive crowns and rim strips bloom, not every lit surface.
     this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.36, 0.72, 0.74);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
+    // Antialiasing, after tone mapping (see the header comment for why this
+    // is FXAA and not MSAA).
+    this.fxaa = new ShaderPass(FXAAShader);
+    this.composer.addPass(this.fxaa);
 
     // Adaptive resolution. The ceiling is the device's own pixel ratio (capped
     // at 2); a sustained slow frame rate steps the render scale down, and a
@@ -208,6 +212,9 @@ export class Stage {
     this.labelRenderer.setSize(w, h);
     this.composer.setSize(w, h);
     this.bloom.setSize(w, h);
+    // FXAA needs the drawing-buffer size, which includes the pixel ratio.
+    const dpr = this.renderer.getPixelRatio();
+    this.fxaa.material.uniforms.resolution.value.set(1 / (w * dpr), 1 / (h * dpr));
   }
 
   start() {

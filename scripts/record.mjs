@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Offline recorder — renders the cinematic tour to a GIF, MP4 or WebM.
+ * Offline recorder — renders the cinematic tour to a GIF, MP4, WebM, or an
+ * animated WebP that embeds in a README.
  *
  * Frames are asked for by timestamp rather than captured in real time. That is
  * the whole trick: a CI runner falls back to software rasterisation and manages
@@ -30,7 +31,7 @@ Usage
 
 Options
   --data <file>     a reposense.json to visualize            (required)
-  --out <file>      .gif, .mp4 or .webm                      (required)
+  --out <file>      .gif, .mp4, .webm or .webp               (required)
   --width <px>      frame width                           (default 1280)
   --height <px>     frame height                           (default 720)
   --fps <n>         frames per second                        (default 30)
@@ -142,7 +143,16 @@ async function encode(framePattern, out, fps) {
       '-c:v', 'libvpx-vp9', '-crf', '32', '-b:v', '0', '-row-mt', '1', out]);
     return;
   }
-  throw new Error(`Unsupported output "${ext}". Use .gif, .mp4 or .webm.`);
+  if (ext === '.webp') {
+    // Animated WebP is the format that belongs in a README: GitHub renders it
+    // inline like a GIF, but real inter-frame compression makes the same
+    // footage roughly a tenth of the size — a GIF of this scene blows past
+    // GitHub's 10 MB image cap in a few seconds.
+    await run('ffmpeg', ['-y', '-framerate', String(fps), '-i', framePattern,
+      '-c:v', 'libwebp_anim', '-q:v', '80', '-compression_level', '6', '-loop', '0', out]);
+    return;
+  }
+  throw new Error(`Unsupported output "${ext}". Use .gif, .mp4, .webm or .webp.`);
 }
 
 async function main() {
