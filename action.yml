@@ -20,7 +20,7 @@ inputs:
     default: reposense.svg
   seconds:
     description: >-
-      Video length. Defaults to the full cinematic tour (~48s). Only used for
+      Video length. Defaults to the full cinematic tour (~54s). Only used for
       gif/mp4/webm/webp. A GIF of more than a few seconds gets large fast.
       Prefer webp for a README embed and mp4/webm for anything else long.
     required: false

@@ -626,5 +626,6 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .brand-mark .ring { animation: none; }
   .launch-inner, .caption, .toast { animation: none; }
+  .panel, .dock, .help[open] { animation: none; }
   .loading-orb span { animation-duration: 4s; }
 }

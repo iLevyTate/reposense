@@ -12,7 +12,7 @@ import { computeLayout, LIFT } from './layout.js';
 import { Stage } from './scene/stage.js';
 import { Arcology } from './scene/arcology.js';
 import { Constellation } from './scene/constellation.js';
-import { Cinema, Recorder, TOUR_DURATION } from './scene/cinema.js';
+import { Cinema, Recorder, TOUR_DURATION, CHRONO_SWEEP } from './scene/cinema.js';
 import { githubUrlFor } from './links.js';
 import { Hud } from './ui/hud.js';
 import { Timeline } from './ui/timeline.js';
@@ -35,6 +35,15 @@ const FLASH_WALL_SECONDS = 0.9;
 /** Offline recording drives frames by timestamp; nothing transient may appear. */
 const RECORDING = new URLSearchParams(location.search).has('record');
 const TIMELINE_SWEEP_SECONDS = 24;
+
+/**
+ * Honour the platform's reduced-motion request for everything that plays on
+ * its own: the build-in reveal, the film grain flicker. The tour still moves;
+ * the viewer pressed play. Recording ignores the setting, because the same
+ * seek must render the same frame on every machine.
+ */
+const REDUCED_MOTION =
+  !RECORDING && typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const app = {
   stage: null,
@@ -343,6 +352,7 @@ async function present(payload) {
 
   if (!app.stage) {
     app.stage = new Stage($('stage'), $('labels'));
+    if (REDUCED_MOTION) app.stage.grade.uniforms.uGrain.value = 0;
     app.cinema = new Cinema(app.stage, {
       onShot: (shot) => {
         app.hud.showCaption(shot);
@@ -398,7 +408,13 @@ async function present(payload) {
   document.querySelector('[data-mode="constellation"]').disabled = app.constellation.empty;
 
   setMode('arcology');
-  app.revealStart = app.stage.clock.elapsedTime;
+  if (REDUCED_MOTION) {
+    app.arcology.setLift(LIFT);
+    app.arcology.setFade(0);
+    app.revealStart = null;
+  } else {
+    app.revealStart = app.stage.clock.elapsedTime;
+  }
   app.selected = null;
   $('search-input').value = '';
 
@@ -439,7 +455,7 @@ function installRecordHook() {
       if (app.mode === 'chronology') {
         // Mirror the live tour's scrub window so the recorded history sweep
         // lands on "today" at the end of the shot.
-        setTime(Math.min(1, Math.max(0, (t / TOUR_DURATION - 0.55) / 0.28)));
+        setTime(Math.min(1, Math.max(0, (t / TOUR_DURATION - CHRONO_SWEEP.start) / CHRONO_SWEEP.span)));
       }
 
       app.arcology.update(1 / 60, t, app.stage.camera);
@@ -921,7 +937,7 @@ function tick(dt, time) {
 
   // The tour drives the chronology scrub itself so the shot lands on "today".
   if (app.cinema.playing && app.mode === 'chronology') {
-    const shotT = Math.min(1, Math.max(0, (app.cinema.shotProgress() - 0.55) / 0.28));
+    const shotT = Math.min(1, Math.max(0, (app.cinema.shotProgress() - CHRONO_SWEEP.start) / CHRONO_SWEEP.span));
     setTime(shotT);
   } else if (app.timePlaying) {
     // Wall clock, for the same reason as the tour and the reveal: a sweep

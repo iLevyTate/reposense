@@ -67,6 +67,8 @@ export class Stage {
     this.controls.maxDistance = 2200;
     this.controls.maxPolarAngle = Math.PI * 0.92;
 
+    this.sky = this.#buildSky();
+    this.scene.add(this.sky);
     this.starfield = this.#buildStarfield();
     this.scene.add(this.starfield);
 
@@ -80,13 +82,14 @@ export class Stage {
     this.composer.addPass(new OutputPass());
     // The grade, applied after tone mapping on display-referred colour: a
     // teal lift in the shadows, faint warmth in the highlights, a whisper of
-    // desaturation, and fine film grain quantised to 24fps of scene time.
-    // The grain is seeded from the timestamp, so the offline recorder gets the identical
-    // frame for the identical time. This is the pass that takes the image
-    // from "renderer output" to "graded picture".
+    // desaturation, a corner vignette, and fine film grain quantised to 24fps
+    // of scene time. The grain is seeded from the timestamp, so the offline
+    // recorder gets the identical frame for the identical time; its strength
+    // is a uniform so reduced-motion viewers get a still image. This is the
+    // pass that takes the image from "renderer output" to "graded picture".
     this.grade = new ShaderPass({
       name: 'GradeShader',
-      uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
+      uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uGrain: { value: 0.016 } },
       vertexShader: `
         varying vec2 vUv;
         void main() {
@@ -96,6 +99,7 @@ export class Stage {
       fragmentShader: `
         uniform sampler2D tDiffuse;
         uniform float uTime;
+        uniform float uGrain;
         varying vec2 vUv;
         float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
         void main() {
@@ -104,9 +108,13 @@ export class Stage {
           c.rgb += vec3(0.008, 0.013, 0.019) * (1.0 - smoothstep(0.0, 0.45, lum));
           c.rgb *= mix(vec3(1.0), vec3(1.02, 1.0, 0.965), smoothstep(0.55, 1.0, lum));
           c.rgb = mix(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.rgb, 0.965);
+          // Vignette: untouched inside the middle, sliding to a gentle corner
+          // falloff. It focuses the eye without reading as a dark frame.
+          float d = length(vUv - 0.5) * 1.35;
+          c.rgb *= 1.0 - 0.16 * smoothstep(0.5, 1.05, d);
           float frame = floor(uTime * 24.0);
           float g = hash(gl_FragCoord.xy * 0.7311 + fract(frame * 0.1031) * vec2(173.0, 591.0));
-          c.rgb += (g - 0.5) * 0.016;
+          c.rgb += (g - 0.5) * uGrain;
           gl_FragColor = c;
         }`,
     });
@@ -165,6 +173,43 @@ export class Stage {
       this._fastFrames = 0;
       this._scaleCooldown = time + 1.5;
     }
+  }
+
+  /**
+   * The sky is a graded dome, not a flat clear colour. Two faint pools of
+   * colour, a cool cyan low on one side and a violet high on the other, give
+   * the void a horizon and a direction; the stars then sit in an atmosphere
+   * instead of on black glass.
+   */
+  #buildSky() {
+    const geo = new THREE.SphereGeometry(2800, 32, 24);
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      vertexShader: `
+        varying vec3 vDir;
+        void main() {
+          vDir = normalize(position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec3 vDir;
+        void main() {
+          // Base: deep navy at the horizon rising to near-black overhead.
+          float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
+          vec3 col = mix(vec3(0.022, 0.032, 0.062), vec3(0.008, 0.011, 0.022), pow(h, 0.7));
+          // Two colour pools, fixed in world space.
+          float cyan = pow(max(dot(vDir, normalize(vec3(-0.6, -0.12, 0.75))), 0.0), 3.0);
+          float violet = pow(max(dot(vDir, normalize(vec3(0.7, 0.45, -0.5))), 0.0), 3.5);
+          col += vec3(0.012, 0.03, 0.05) * cyan;
+          col += vec3(0.028, 0.016, 0.045) * violet;
+          gl_FragColor = vec4(col, 1.0);
+        }`,
+    });
+    const dome = new THREE.Mesh(geo, mat);
+    dome.renderOrder = -10;
+    dome.frustumCulled = false;
+    return dome;
   }
 
   #buildStarfield() {

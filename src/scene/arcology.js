@@ -66,6 +66,7 @@ export class Arcology {
     this.#buildTerraces();
     this.#buildBridges();
     this.#buildCore();
+    this.#buildMotes();
     this.#buildLabels();
     this.#buildSelection();
   }
@@ -208,6 +209,55 @@ export class Arcology {
       aFlash: geo.attributes.aFlash,
     };
     this.group.add(mesh);
+
+    // Contact shadows. A soft dark pool under each tower is what makes a
+    // building sit on its terrace instead of hovering a millimetre above it.
+    // The quads share the towers' appear and ring arrays, so the reveal and
+    // the chronology drive both from one update; the attribute objects are
+    // separate, so both need their dirty flags raised (see #flagShared).
+    const shadowGeo = new THREE.PlaneGeometry(1, 1);
+    shadowGeo.rotateX(-Math.PI / 2);
+    shadowGeo.setAttribute('aRing', new THREE.InstancedBufferAttribute(aRing, 1));
+    shadowGeo.setAttribute('aAppear', new THREE.InstancedBufferAttribute(aAppear, 1));
+    shadowGeo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(aSeed, 1));
+    this.sharedAppear = [this.attrs.aAppear, shadowGeo.attributes.aAppear];
+
+    const shadowMat = new THREE.ShaderMaterial({
+      uniforms: this.uniforms,
+      transparent: true,
+      depthWrite: false,
+      vertexShader: `
+        attribute float aRing;
+        attribute float aAppear;
+        attribute float aSeed;
+        uniform float uFade;
+        varying vec2 vUvL;
+        varying float vA;
+        void main() {
+          vUvL = uv;
+          float reveal = clamp((1.0 - uFade) * 3.0 - aRing * 0.42 - aSeed * 0.25, 0.0, 1.0);
+          vA = aAppear * reveal;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec2 vUvL;
+        varying float vA;
+        void main() {
+          float d = length(vUvL - 0.5) * 2.0;
+          float a = smoothstep(1.0, 0.15, d) * 0.42 * vA;
+          gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+        }`,
+    });
+    this.shadows = new THREE.InstancedMesh(shadowGeo, shadowMat, count);
+    this.shadows.frustumCulled = false;
+    this.shadows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.shadows.renderOrder = -0.5;
+    this.group.add(this.shadows);
+  }
+
+  /** Raise the dirty flag on every attribute object sharing one array. */
+  #flagShared() {
+    for (const attr of this.sharedAppear) attr.needsUpdate = true;
   }
 
   #towerMaterial() {
@@ -625,6 +675,84 @@ export class Arcology {
     this.group.add(core);
   }
 
+  /* ------------------------------------------------------------------- motes */
+
+  /**
+   * Slow dust drifting through the structure. A few hundred faint points give
+   * the air a volume for the towers to stand in, and their parallax is what
+   * sells the camera moves. Positions are seeded and the drift is a pure
+   * function of scene time, so the offline recorder stays deterministic.
+   */
+  #buildMotes() {
+    const maxR = ((this.layout.maxRing ?? 4) + 2) * this.layout.ringGap + this.layout.band;
+    const COUNT = Math.min(340, Math.max(140, Math.round(maxR * 2.2)));
+
+    let s = 0x9e3779b9;
+    const rand = () => {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+
+    const positions = new Float32Array(COUNT * 3);
+    const seeds = new Float32Array(COUNT);
+    const sizes = new Float32Array(COUNT);
+    const height = Math.max(this.layout.band * 3, this.layout.fitHeight * 1.5);
+    for (let i = 0; i < COUNT; i += 1) {
+      // sqrt keeps the disc evenly filled instead of clumped at the middle.
+      const r = Math.sqrt(rand()) * maxR * 1.25;
+      const a = rand() * Math.PI * 2;
+      positions[i * 3] = Math.cos(a) * r;
+      positions[i * 3 + 1] = rand() * height - this.layout.band * 0.2;
+      positions[i * 3 + 2] = Math.sin(a) * r;
+      seeds[i] = rand() * 100;
+      sizes[i] = 0.9 + rand() * 1.8;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+    geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.uniforms,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      vertexShader: `
+        attribute float aSeed;
+        attribute float aSize;
+        uniform float uTime;
+        uniform float uFade;
+        varying float vA;
+        void main() {
+          vec3 p = position;
+          p.x += sin(uTime * 0.09 + aSeed * 1.7) * 3.5;
+          p.y += sin(uTime * 0.06 + aSeed * 2.3) * 2.5;
+          p.z += cos(uTime * 0.08 + aSeed * 1.1) * 3.5;
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          gl_PointSize = aSize * 260.0 / max(40.0, -mv.z);
+          // Each mote breathes on its own phase; all of them obey the reveal.
+          vA = (0.5 + 0.5 * sin(uTime * 0.5 + aSeed * 3.7)) * (1.0 - uFade);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        varying float vA;
+        void main() {
+          float d = length(gl_PointCoord - 0.5) * 2.0;
+          float disc = smoothstep(1.0, 0.2, d);
+          gl_FragColor = vec4(vec3(0.62, 0.74, 0.92), disc * vA * 0.14);
+        }`,
+    });
+
+    this.motes = new THREE.Points(geo, mat);
+    this.motes.frustumCulled = false;
+    this.motes.renderOrder = -1;
+    this.group.add(this.motes);
+  }
+
   /* ------------------------------------------------------------------ labels */
 
   #buildLabels() {
@@ -703,13 +831,21 @@ export class Arcology {
     const files = this.layout.files;
     const m = new THREE.Matrix4();
     const pos = new THREE.Vector3();
+    const shadowScale = new THREE.Vector3();
     for (let i = 0; i < files.length; i += 1) {
       const f = files[i];
       pos.set(f.x, f.ring * this.lift, f.z);
       m.compose(pos, this.towerParts.quat[i], this.towerParts.scale[i]);
       this.towers.setMatrixAt(i, m);
+
+      const ts = this.towerParts.scale[i];
+      pos.y += 0.07; // just above the terrace, safely clear of z-fighting
+      shadowScale.set(ts.x * 2.3, 1, ts.z * 2.3);
+      m.compose(pos, this.towerParts.quat[i], shadowScale);
+      this.shadows.setMatrixAt(i, m);
     }
     this.towers.instanceMatrix.needsUpdate = true;
+    this.shadows.instanceMatrix.needsUpdate = true;
     this.towers.computeBoundingSphere();
   }
 
@@ -803,7 +939,7 @@ export class Arcology {
         heat[i] = touched ? 0 : f.heat * 0.25;
       }
     }
-    this.attrs.aAppear.needsUpdate = true;
+    this.#flagShared();
     this.attrs.aHeat.needsUpdate = true;
     this.attrs.aFlash.needsUpdate = true;
     return { visible, bytes };
@@ -819,7 +955,7 @@ export class Arcology {
       flash[i] = 0;
       heat[i] = this.fileByInstance[i].heat || 0;
     }
-    this.attrs.aAppear.needsUpdate = true;
+    this.#flagShared();
     this.attrs.aHeat.needsUpdate = true;
     this.attrs.aFlash.needsUpdate = true;
   }
@@ -856,9 +992,12 @@ export class Arcology {
       obj.getWorldPosition(_labelPos);
       const dist = _labelPos.distanceTo(camera.position);
       // Shallow folders stay legible from further out; deep ones only appear
-      // once you fly in, which keeps the wide shots clean.
+      // once you fly in, which keeps the wide shots clean. The last quarter
+      // of the range fades, so labels dissolve instead of popping.
       const threshold = unit * (2.2 + (budget - Math.min(d, budget)) * 0.75);
-      obj.visible = dist < threshold;
+      const fade = Math.max(0, Math.min(1, (threshold - dist) / (threshold * 0.25)));
+      obj.visible = fade > 0.01;
+      if (obj.visible) obj.element.style.opacity = fade.toFixed(3);
     }
   }
 

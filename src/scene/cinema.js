@@ -15,6 +15,13 @@ import * as THREE from 'three';
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
+// Interactive flights only: shots and offline recording keep their timing so
+// a seek renders the same frame on every machine, whatever it prefers.
+const REDUCED =
+  typeof matchMedia === 'function' &&
+  matchMedia('(prefers-reduced-motion: reduce)').matches &&
+  !new URLSearchParams(location.search).has('record');
+
 /**
  * Shot list.
  *   r      multiple of the structure's radius
@@ -54,6 +61,18 @@ const SHOTS = [
     sub: 'each terrace is a directory, holding what it contains',
   },
   {
+    name: 'Boulevard',
+    duration: 6,
+    mode: 'arcology',
+    // A low dolly along the outer ring: the camera skims just above the
+    // terraces, and the towers pass by as architecture.
+    from: { r: 1.18, theta: 2.55, phi: 1.22, ty: 0.56 },
+    to: { r: 1.08, theta: 3.6, phi: 1.3, ty: 0.55 },
+    ease: easeInOut,
+    caption: 'Street level',
+    sub: 'the same files, at the scale of a city block',
+  },
+  {
     name: 'Chronology',
     duration: 11,
     mode: 'chronology',
@@ -87,6 +106,25 @@ const SHOTS = [
 
 export const TOUR_DURATION = SHOTS.reduce((s, x) => s + x.duration, 0);
 export { SHOTS };
+
+/**
+ * The window of the tour, as fractions, over which the chronology scrub
+ * sweeps from the first commit to today. Derived from the shot list, so
+ * adding or resizing shots cannot silently detach the sweep from the shot
+ * it belongs to. The sweep starts partway into the shot, once the cut has
+ * settled, and runs a little past its end so "today" lands on the outgoing
+ * transition rather than a hard stop.
+ */
+export const CHRONO_SWEEP = (() => {
+  let acc = 0;
+  for (const s of SHOTS) {
+    if (s.mode === 'chronology') {
+      return { start: (acc + s.duration * 0.4) / TOUR_DURATION, span: (s.duration * 1.22) / TOUR_DURATION };
+    }
+    acc += s.duration;
+  }
+  return { start: 0.55, span: 0.28 };
+})();
 
 export class Cinema {
   constructor(stage, { onShot, onProgress, onEnd } = {}) {
@@ -192,6 +230,7 @@ export class Cinema {
     // a class on #viewer, and only the stop path takes it off again. Flying
     // somewhere mid-tour used to leave the UI invisible and unclickable.
     if (this.playing) this.stop();
+    if (REDUCED) duration = Math.min(duration, 0.35);
     this._fly = {
       startedAt: null,
       duration,
