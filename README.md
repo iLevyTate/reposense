@@ -10,15 +10,15 @@ lit by how recently it changed.
 
 [**Open the visualizer →**](https://ilevytate.github.io/reposense/)
 
-<a href="https://ilevytate.github.io/reposense/#/iLevyTate/reposense">
+<a href="https://ilevytate.github.io/reposense/#/expressjs/express">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="public/reposense-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="public/reposense-light.svg">
-    <img alt="RepoSense's own repository rendered as an isometric city: concentric terraces stepping outward, a tower for every file, lit windows on the tall ones" src="public/reposense-dark.svg" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="public/examples/express-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="public/examples/express-light.svg">
+    <img alt="expressjs/express rendered as an isometric city: an amphitheatre of terraces with a lit tower for every file, its history glowing through the windows" src="public/examples/express-dark.svg" width="100%">
   </picture>
 </a>
 
-<sub>RepoSense rendering itself: the Action's own SVG output, following your GitHub theme. Clicking any shot opens this repository in the live explorer.</sub>
+<sub><b>expressjs/express</b>, rendered by the Action as pure SVG. It follows your GitHub theme; click it to fly through the same repository live.</sub>
 
 <table>
   <tr>
@@ -56,12 +56,12 @@ page talks to the GitHub API from your browser.
 Anything recognisable works in the box:
 
 ```
-sindresorhus/got
+expressjs/express
 https://github.com/pallets/flask
 git@github.com:charmbracelet/bubbletea.git
 ```
 
-Every view is linkable. `…/reposense/#/pallets/flask` loads that repo directly.
+Every view is linkable. `…/reposense/#/expressjs/express` loads that repo directly.
 
 > **On rate limits.** Anonymous GitHub API access allows 60 requests an hour
 > per IP. The structure costs about five requests, and the history replay that
