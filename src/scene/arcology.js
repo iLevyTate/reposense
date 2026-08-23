@@ -350,7 +350,11 @@ export class Arcology {
             col *= vState * 2.2;
             alpha = 0.30;
           } else if (vState > 1.5) {   // search hit
-            col = mix(col, vec3(1.0), 0.30) * 2.4;
+            // Bright enough to find from across the structure, restrained
+            // enough that flying up to it still shows a building rather than
+            // a white nuke. The slow breath separates "found" from "lit".
+            float breath = 0.92 + 0.14 * sin(uTime * 2.6);
+            col = mix(col, vec3(1.0), 0.18) * 1.55 * breath;
           }
 
           // Atmospheric perspective.
