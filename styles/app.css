@@ -225,7 +225,7 @@ code, kbd, .mono { font-family: var(--mono); }
   background: radial-gradient(120% 90% at 50% 50%, transparent 46%, rgba(2, 4, 10, 0.72) 100%);
 }
 .scanline {
-  position: absolute; inset: 0; pointer-events: none; opacity: 0.055;
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.028;
   background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.9) 0 1px, transparent 1px 3px);
   mix-blend-mode: overlay;
 }
