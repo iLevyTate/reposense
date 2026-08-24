@@ -88,12 +88,12 @@ test('themes produce different output but the same geometry', () => {
   assert.equal(renderSvg(payload, { theme: 'chartreuse' }), dark);
 });
 
-test('width drives the output size and the frame stays at least 7:4', () => {
+test('width drives the output size and the frame never becomes a column', () => {
   for (const width of [600, 1280, 2400]) {
     const { width: w, height: h } = attrs(renderSvg(payload, { width }));
     assert.equal(w, width);
     assert.ok(h > 0);
-    assert.ok(w / h >= 1.74, `ratio ${(w / h).toFixed(2)} is at least 7:4`);
+    assert.ok(w / h >= 1.34, `ratio ${(w / h).toFixed(2)} is at least 1.35:1`);
   }
 });
 

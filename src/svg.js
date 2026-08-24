@@ -310,7 +310,12 @@ export function renderSvg(payload, opts = {}) {
   for (const f of layout.files) {
     const y0 = f.ring * LIFT;
     const y1 = y0 + f.height;
-    const w = Math.max(0.7, f.footprint * 0.5);
+    // Half-width, bounded by the cell the tower stands in. The footprint alone
+    // is not enough: the footprint is an axis-aligned square, so at an off-axis
+    // angle its diagonal reaches 1.41x the half-width and neighbours in a dense
+    // district merge into one serrated ribbon. Bounding by the cell keeps a
+    // visible gap between every pair of buildings at any angle.
+    const w = Math.max(0.26, Math.min(f.footprint * 0.5, f.cell * 0.33));
     const ca = Math.cos(f.aMid);
     const sa = Math.sin(f.aMid);
     // Axis-aligned footprint keeps the polygon count at three faces per tower.
@@ -395,14 +400,16 @@ export function renderSvg(payload, opts = {}) {
   let minY = bounds.minY - pad;
   let maxY = bounds.maxY + pad;
 
-  // Keep the finished frame no narrower than 7:4 so the result sits well in a
-  // README rather than becoming a tall column on a deep, narrow tree. Wider
-  // than that trades drawing for empty margin, which is the worse deal.
+  // Keep the finished frame from becoming a tall column on a deep, narrow
+  // tree, and no more than that. The floor is deliberately low: a radial
+  // structure is often close to square, and forcing such a drawing into a wide
+  // letterbox pads it with more empty margin than the drawing is wide, which
+  // leaves the structure marooned in the middle of its own frame.
   //
   // The legend band is a fraction of the final width, which the width also
   // depends on, so solve it rather than iterate:
   //   W / (drawnH + k·W) >= R   ->   W >= R·drawnH / (1 - R·k)
-  const MIN_RATIO = 1.75;
+  const MIN_RATIO = 1.35;
   const LEGEND_K = showLegend ? 0.14 : 0;
   const drawnW = maxX - minX;
   const drawnH = maxY - minY;
