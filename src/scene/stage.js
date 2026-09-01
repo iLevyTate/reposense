@@ -273,6 +273,10 @@ export class Stage {
 
     const points = new THREE.Points(geo, mat);
     points.frustumCulled = false;
+    // Behind everything the scene puts in front of it, and pinned there: the
+    // stars write no depth, so a distance sort that ever placed them after a
+    // structure would let them draw straight over it.
+    points.renderOrder = -9;
     points.userData.material = mat;
     return points;
   }
