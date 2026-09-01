@@ -280,7 +280,15 @@ async function loadFromRoute() {
   const deepScan = getToken() ? wanted : Math.min(wanted, ANON_DEEP_SCAN_MAX);
 
   await withLoading(async (signal) => {
-    const payload = await fetchRepo(repo, { signal, deepScan, onProgress: (p) => app.hud.setProgress(p) });
+    // Spreading the scan across the whole history costs extra listing
+    // requests. A token holder has five thousand an hour and will not notice;
+    // an anonymous caller has sixty in total, so they keep the newest slice.
+    const payload = await fetchRepo(repo, {
+      signal,
+      deepScan,
+      spread: !!getToken(),
+      onProgress: (p) => app.hud.setProgress(p),
+    });
     // Surface the clamp in the composition notes rather than silently
     // delivering less history than the slider asked for, but only when the
     // clamp actually bit. A repository with fewer commits than the clamp ran
@@ -759,10 +767,16 @@ function describeCoverage(payload, timeline) {
   const scan = payload.scan;
   const what = timeline.describe();
   if (!scan?.commits) return what;
-  if (scan.source === 'git log' && !scan.limited) {
-    return `${what} · full git log (${scan.commits.toLocaleString()} commits)`;
+  const n = (v) => v.toLocaleString();
+  if (scan.source === 'git log') {
+    // The CLI dates every commit whatever the budget, and only the per-file
+    // diff pass is ever bounded, so those two numbers are reported separately.
+    if (!scan.limited) return `${what} · full git log (${n(scan.commits)} commits)`;
+    const how = scan.spread ? 'across the whole history' : 'from the newest';
+    return `${what} · ${n(scan.commits)} commits dated, ${n(scan.diffed)} diffed ${how}`;
   }
-  return `${what} · newest ${scan.commits.toLocaleString()} commits`;
+  if (scan.spread) return `${what} · ${n(scan.commits)} commits spread over the newest ${n(scan.listed)}`;
+  return `${what} · newest ${n(scan.commits)} commits`;
 }
 
 function timeRange() {
