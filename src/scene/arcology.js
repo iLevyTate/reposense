@@ -24,6 +24,52 @@ import { hexToRgb, colorOf } from '../palette.js';
 
 const MAX_LABELS = 64;
 
+/**
+ * Fixed draw order for the transparent queue.
+ *
+ * Three.js sorts transparent objects by distance to the camera, so two meshes
+ * that overlap on screen can swap places from one frame to the next. When the
+ * additive rim strips landed behind the towers instead of in front of them,
+ * a whole terrace edge blinked out for a frame and came back, which is the
+ * flicker that made the structure look like it was phasing through its own
+ * datum plane. Pinning the order removes the swap and, as a bonus, makes the
+ * recorded frames independent of the camera path that reached them.
+ */
+const ORDER = {
+  ground: -4,
+  terraces: -3,
+  shadows: -2,
+  towers: 0,
+  rims: 1,
+  bridges: 1,
+  motes: 2,
+  beam: 3,
+  core: 3,
+};
+
+/**
+ * Depth-buffer bias for surfaces that share a plane with the terrace they sit
+ * on: the rim strips and the contact shadows. Polygon offset is expressed in
+ * units of the smallest resolvable depth difference at the fragment, so one
+ * constant holds from a close fly-by to the widest establishing shot. A world
+ * space epsilon cannot: 0.07 of a unit separates two surfaces cleanly at 40
+ * units from the camera and is worth a fraction of a depth step at 900.
+ */
+const DECAL_OFFSET = { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 };
+
+/**
+ * How much later each tier starts building during the reveal: one step per
+ * ring outward, plus a small per-tower jitter so a district does not rise as
+ * one slab. The two are summed into `uStagger` and folded back into the rate
+ * (see the reveal expression in every shader below), because a fixed rate
+ * runs out of animation before the outermost ring is done. At the old rate of
+ * 3.0 a seventh ring finished the sweep 6% built and stayed there: uFade
+ * reads 0, the structure is declared complete, and the deepest folders sit on
+ * the datum plane as ghosts of themselves with their towers still flat.
+ */
+const RING_STAGGER = 0.42;
+const SEED_STAGGER = 0.25;
+
 /** Cool grey-blue the directory floors are tinted toward. */
 const STRUCTURE_TINT = { r: 0.36, g: 0.46, b: 0.66 };
 
@@ -51,6 +97,12 @@ export class Arcology {
       uTime: { value: 0 },
       uHeatBoost: { value: 1 },
       uFade: { value: 0 }, // 0 = fully built, 1 = not yet revealed
+      // Total spread of the reveal stagger, from the innermost ring to the
+      // last tower of the outermost one. Every shader divides the sweep over
+      // 1 + this, so uFade = 0 leaves nothing half-built at any depth.
+      uStagger: {
+        value: (((layout.maxRing ?? 4) + 1) * RING_STAGGER) + SEED_STAGGER,
+      },
       // Atmospheric perspective, scaled to this structure: the far side of a
       // big repository recedes into the backdrop instead of stacking on the
       // near side at full contrast.
@@ -115,9 +167,23 @@ export class Arcology {
           // Light pooled under the core, dying away with radius.
           float pool = exp(-pow(r / (uMaxR * 0.6), 2.0));
           vec3 col = mix(vec3(0.006, 0.01, 0.026), vec3(0.045, 0.085, 0.165), pool);
+
           // Concentric guides at the ring radii, strongest near the middle.
+          //
+          // The guide is drawn at a constant *apparent* width rather than a
+          // constant world width. The disc is seen almost edge-on for most of
+          // the tour, so a fixed 0.8-unit line is several pixels wide near the
+          // camera and a fraction of a pixel further out, where point sampling
+          // turns it into a crawling dashed arc. Widening the line with the
+          // screen-space rate of change of the radius keeps every guide about
+          // a pixel and a half thick wherever it lands.
+          float rw = max(fwidth(r), 1e-4);
+          float lineW = max(0.8, rw * 1.5);
           float band = abs(fract(r / uRingGap + 0.5) - 0.5) * uRingGap;
-          float line = smoothstep(0.8, 0.0, band) * smoothstep(uMaxR * 1.7, uMaxR * 0.25, r);
+          float line = smoothstep(lineW, lineW * 0.2, band) * smoothstep(uMaxR * 1.7, uMaxR * 0.25, r);
+          // Past the point where neighbouring guides would land in the same
+          // pixel, the set dissolves instead of aliasing into moire rings.
+          line *= 1.0 - smoothstep(uRingGap * 0.10, uRingGap * 0.34, rw);
           col += vec3(0.24, 0.38, 0.62) * line * 0.055;
           float fog = 1.0 - exp(-vDist * vDist * uFogDensity);
           col = mix(col, uFogColor, fog * 0.7);
@@ -129,7 +195,7 @@ export class Arcology {
 
     this.ground = new THREE.Mesh(geo, mat);
     this.ground.position.y = -this.layout.band * 0.26;
-    this.ground.renderOrder = -2;
+    this.ground.renderOrder = ORDER.ground;
     this.ground.frustumCulled = false;
     this.group.add(this.ground);
   }
@@ -162,6 +228,7 @@ export class Arcology {
 
     const mesh = new THREE.InstancedMesh(geo, this.#towerMaterial(), count);
     mesh.frustumCulled = false;
+    mesh.renderOrder = ORDER.towers;
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
     // Tower altitude is baked into the instance matrix rather than added in the
@@ -226,16 +293,18 @@ export class Arcology {
       uniforms: this.uniforms,
       transparent: true,
       depthWrite: false,
+      ...DECAL_OFFSET,
       vertexShader: `
         attribute float aRing;
         attribute float aAppear;
         attribute float aSeed;
         uniform float uFade;
+        uniform float uStagger;
         varying vec2 vUvL;
         varying float vA;
         void main() {
           vUvL = uv;
-          float reveal = clamp((1.0 - uFade) * 3.0 - aRing * 0.42 - aSeed * 0.25, 0.0, 1.0);
+          float reveal = clamp((1.0 - uFade) * (1.0 + uStagger) - aRing * ${RING_STAGGER.toFixed(3)} - aSeed * ${SEED_STAGGER.toFixed(3)}, 0.0, 1.0);
           vA = aAppear * reveal;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }`,
@@ -251,7 +320,7 @@ export class Arcology {
     this.shadows = new THREE.InstancedMesh(shadowGeo, shadowMat, count);
     this.shadows.frustumCulled = false;
     this.shadows.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.shadows.renderOrder = -0.5;
+    this.shadows.renderOrder = ORDER.shadows;
     this.group.add(this.shadows);
   }
 
@@ -276,6 +345,7 @@ export class Arcology {
         uniform float uLift;
         uniform float uTime;
         uniform float uFade;
+        uniform float uStagger;
 
         varying vec3 vColor;
         varying float vY;
@@ -290,6 +360,7 @@ export class Arcology {
         varying vec3 vScale;
         varying float vSeed;
         varying float vDist;
+        varying float vGrow;
 
         void main() {
           vFlash = aFlash;
@@ -303,10 +374,15 @@ export class Arcology {
           vY = position.y; // 0 at base, 1 at tip (box was translated)
 
           // The reveal sweeps outward: outer rings finish building last.
-          float reveal = clamp((1.0 - uFade) * 3.0 - aRing * 0.42 - aSeed * 0.25, 0.0, 1.0);
+          float reveal = clamp((1.0 - uFade) * (1.0 + uStagger) - aRing * ${RING_STAGGER.toFixed(3)} - aSeed * ${SEED_STAGGER.toFixed(3)}, 0.0, 1.0);
           reveal = reveal * reveal * (3.0 - 2.0 * reveal);
           float grow = aAppear * reveal;
           vAlpha = step(0.001, grow);
+          // The fragment shader lays the window grid out in world height, so
+          // it needs to know how much of the tower is actually standing. Row
+          // spacing then holds while a building rises instead of the whole
+          // facade stretching with it.
+          vGrow = grow;
 
           vec3 p = position;
           p.y *= grow;
@@ -339,6 +415,18 @@ export class Arcology {
         varying vec3 vScale;
         varying float vSeed;
         varying float vDist;
+        varying float vGrow;
+
+        /**
+         * One pane edge, filtered over the pixel it lands in. The w argument
+         * is the screen-space width of a cell, so the rectangle keeps an edge
+         * roughly one pixel wide however far away the tower is. Point
+         * sampling a step() here is what made the facades crawl.
+         */
+        float paneBand(float x, float lo, float hi, float w) {
+          float e = max(w, 0.0015);
+          return clamp(smoothstep(lo - e, lo + e, x) - smoothstep(hi - e, hi + e, x), 0.0, 1.0);
+        }
 
         void main() {
           if (vAlpha < 0.5) discard;
@@ -375,23 +463,48 @@ export class Arcology {
           // is what makes a close fly-by read as an inhabited structure rather
           // than a glowing slab. It is a pure function of geometry and
           // seed, so every frame and every renderer agrees.
-          float sideness = step(abs(vNLocal.y), 0.5);
+          //
+          // The whole pattern is filtered against its own screen-space
+          // footprint. A grid this fine is far below one pixel per cell on
+          // any wide shot, and point sampling it there produced the speckle
+          // that boiled across the facades whenever the camera moved.
+          // Chamfer normals interpolate, so sideness fades across the bevel
+          // instead of switching at it.
+          float sideness = smoothstep(0.62, 0.42, abs(vNLocal.y));
           float u = abs(vNLocal.x) > 0.5 ? (vLocal.z + 0.5) : (vLocal.x + 0.5);
           float faceW = abs(vNLocal.x) > 0.5 ? vScale.z : vScale.x;
-          float h = vY * vScale.y;
+          float h = vY * vGrow * vScale.y;
           float cols = max(1.0, floor(faceW / 1.05));
           float rowH = 1.55;
           // Rows are staggered per building; a whole district whose windows
           // align to one grid is the repetition the eye flags as synthetic.
+          float uu = u * cols;
           float hh = h / rowH + vSeed * 0.83;
-          vec2 cell = vec2(fract(u * cols), fract(hh));
-          float pane = step(0.2, cell.x) * step(cell.x, 0.8) * step(0.3, cell.y) * step(cell.y, 0.74);
-          vec2 id = vec2(floor(u * cols), floor(hh));
+          // Derivatives are taken on the unwrapped coordinates: fract() spikes
+          // fwidth at every cell boundary. The clamp covers the geometry edges
+          // where the 2x2 quad straddles two faces.
+          float wu = min(fwidth(uu), 0.5);
+          float wv = min(fwidth(hh), 0.5);
+          vec2 cell = vec2(fract(uu), fract(hh));
+          float pane = paneBand(cell.x, 0.2, 0.8, wu) * paneBand(cell.y, 0.3, 0.74, wv);
+          vec2 id = vec2(floor(uu), floor(hh));
           float litHash = fract(sin(dot(vec3(id, vSeed * 61.7), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
           float lit = step(0.42, litHash);
+          // Once a cell is worth about half a pixel the grid stops being
+          // resolvable, so both the pane mask and the lit/unlit hash cross
+          // fade to their own averages: 0.6 x 0.44 of a cell is glass, and
+          // 58% of cells are lit. The tower keeps the warmth of an inhabited
+          // facade at distance and loses only detail it could not draw.
+          float sharp = 1.0 - smoothstep(0.16, 0.5, max(wu, wv));
+          pane = mix(0.264, pane, sharp);
+          lit = mix(0.58, lit, sharp);
           // Only towers tall enough to have storeys get windows, and the top
-          // band stays clean so the crown keeps its line.
-          float windows = pane * sideness * step(4.0, vScale.y) * step(0.04, vY) * (1.0 - step(0.88, vY));
+          // band stays clean so the crown keeps its line. Both limits are
+          // ramps: a hard cut left a visible seam around the parapet and a
+          // step between two buildings a hair either side of the threshold.
+          float storeys = smoothstep(3.5, 5.5, vScale.y);
+          float bodyBand = smoothstep(0.03, 0.07, vY) * (1.0 - smoothstep(0.84, 0.9, vY));
+          float windows = pane * sideness * storeys * bodyBand;
           vec3 glass = mix(body * 0.10, mix(vColor, vec3(1.0, 0.93, 0.78), 0.55) * 1.3, lit);
           col = mix(col, glass, windows * 0.85);
 
@@ -509,23 +622,25 @@ export class Arcology {
       this.#surfaceMaterial({ opacity: 0.96, additive: false, depthWrite: true }),
     );
     this.terraces.frustumCulled = false;
-    this.terraces.renderOrder = -1;
+    this.terraces.renderOrder = ORDER.terraces;
 
     this.rims = new THREE.Mesh(
       makeGeometry(rims),
-      this.#surfaceMaterial({ opacity: 1, additive: true, depthWrite: false }),
+      this.#surfaceMaterial({ opacity: 1, additive: true, depthWrite: false, decal: true }),
     );
     this.rims.frustumCulled = false;
+    this.rims.renderOrder = ORDER.rims;
 
     this.group.add(this.terraces, this.rims);
   }
 
-  #surfaceMaterial({ opacity, additive, depthWrite }) {
+  #surfaceMaterial({ opacity, additive, depthWrite, decal = false }) {
     return new THREE.ShaderMaterial({
       defines: { ADDITIVE: additive ? 'true' : 'false' },
       uniforms: { ...this.uniforms, uOpacity: { value: opacity } },
       transparent: true,
       depthWrite,
+      ...(decal ? DECAL_OFFSET : null),
       side: THREE.DoubleSide,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       vertexShader: `
@@ -533,12 +648,13 @@ export class Arcology {
         attribute vec3 aColor;
         uniform float uLift;
         uniform float uFade;
+        uniform float uStagger;
         varying vec3 vColor;
         varying float vAlpha;
         varying float vDist;
         void main() {
           vColor = aColor;
-          float reveal = clamp((1.0 - uFade) * 3.0 - aRing * 0.42, 0.0, 1.0);
+          float reveal = clamp((1.0 - uFade) * (1.0 + uStagger) - aRing * ${RING_STAGGER.toFixed(3)}, 0.0, 1.0);
           vAlpha = reveal * reveal * (3.0 - 2.0 * reveal);
           vec3 p = position;
           p.y += aRing * uLift;
@@ -597,7 +713,12 @@ export class Arcology {
     this.bridges = new THREE.LineSegments(
       geo,
       new THREE.ShaderMaterial({
-        uniforms: this.uniforms,
+        // A ramp ends on the deck it serves, so both of its endpoints sit in a
+        // terrace plane. Polygon offset covers triangles only, so the rails
+        // clear the deck in world space instead: a couple of decimetres, small
+        // enough to still read as touching and large enough that the line
+        // never dips through the floor it lands on.
+        uniforms: { ...this.uniforms, uDeckClear: { value: this.layout.band * 0.02 } },
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
@@ -606,15 +727,17 @@ export class Arcology {
           attribute float aRing;
           uniform float uLift;
           uniform float uFade;
+          uniform float uStagger;
+          uniform float uDeckClear;
           varying vec3 vColor;
           varying float vAlpha;
           varying float vDist;
           void main() {
             vColor = aColor;
-            float reveal = clamp((1.0 - uFade) * 3.0 - aRing * 0.42, 0.0, 1.0);
-            vAlpha = reveal;
+            float reveal = clamp((1.0 - uFade) * (1.0 + uStagger) - aRing * ${RING_STAGGER.toFixed(3)}, 0.0, 1.0);
+            vAlpha = reveal * reveal * (3.0 - 2.0 * reveal);
             vec3 p = position;
-            p.y += aRing * uLift;
+            p.y += aRing * uLift + uDeckClear;
             vec4 mv = modelViewMatrix * vec4(p, 1.0);
             vDist = length(mv.xyz);
             gl_Position = projectionMatrix * mv;
@@ -632,6 +755,7 @@ export class Arcology {
       }),
     );
     this.bridges.frustumCulled = false;
+    this.bridges.renderOrder = ORDER.bridges;
     this.group.add(this.bridges);
   }
 
@@ -671,6 +795,7 @@ export class Arcology {
       }),
     );
     core.position.y = 2;
+    core.renderOrder = ORDER.core;
     this.core = core;
     this.group.add(core);
   }
@@ -749,7 +874,7 @@ export class Arcology {
 
     this.motes = new THREE.Points(geo, mat);
     this.motes.frustumCulled = false;
-    this.motes.renderOrder = -1;
+    this.motes.renderOrder = ORDER.motes;
     this.group.add(this.motes);
   }
 
@@ -813,6 +938,7 @@ export class Arcology {
           }`,
       }),
     );
+    this.beam.renderOrder = ORDER.beam;
     this.beam.visible = false;
     this.group.add(this.beam);
   }
@@ -839,7 +965,8 @@ export class Arcology {
       this.towers.setMatrixAt(i, m);
 
       const ts = this.towerParts.scale[i];
-      pos.y += 0.07; // just above the terrace, safely clear of z-fighting
+      // The quad shares the terrace's plane exactly; DECAL_OFFSET on its
+      // material is what keeps it in front, at every distance.
       shadowScale.set(ts.x * 2.3, 1, ts.z * 2.3);
       m.compose(pos, this.towerParts.quat[i], shadowScale);
       this.shadows.setMatrixAt(i, m);
