@@ -69,9 +69,38 @@ test('--no-history skips the git log pass entirely', async () => {
   assert.ok(payload.files.length > 0, 'structure is still scanned');
 });
 
-test('--commits bounds how much history is replayed', async () => {
-  const payload = await scan(ROOT, ['--commits', '1']);
-  assert.equal(payload.scan.commits, 1);
+test('--commits bounds the diff pass without truncating the timeline', async () => {
+  // The budget applies to the expensive per-file pass only. Dating every
+  // commit and finding when each file first appeared are cheap traversals, so
+  // they always cover everything: a bounded scan of a ten-year repository must
+  // still produce a ten-year chronology, not a chronology of last week.
+  const full = await scan(ROOT);
+  const bounded = await scan(ROOT, ['--commits', '1']);
+
+  assert.equal(bounded.scan.diffed, 1, 'only one commit is diffed');
+  assert.equal(bounded.scan.limited, true);
+  assert.equal(bounded.scan.commits, full.scan.commits, 'every commit is still dated');
+  assert.deepEqual(bounded.activity, full.activity, 'the activity strip is unbounded');
+
+  const firstAdd = (p) => Math.min(...p.files.filter((f) => f.addedAt).map((f) => f.addedAt));
+  assert.equal(firstAdd(bounded), firstAdd(full), 'creation dates reach as far back as ever');
+});
+
+test('--spread samples the diff pass across the whole history', async () => {
+  const newest = await scan(ROOT, ['--commits', '4']);
+  const spread = await scan(ROOT, ['--commits', '4', '--spread']);
+
+  assert.equal(spread.scan.spread, true);
+  assert.equal(newest.scan.spread, false);
+  assert.ok(spread.scan.diffed <= 4, 'the budget is still a budget');
+
+  // The spread sample has to reach further back than the contiguous one. Both
+  // include the newest commits, so only the oldest end can differ.
+  const oldestTouch = (p) => Math.min(...p.files.filter((f) => f.lastTouched).map((f) => f.lastTouched));
+  assert.ok(
+    oldestTouch(spread) < oldestTouch(newest),
+    `spread reaches back to ${oldestTouch(spread)}, newest-first only to ${oldestTouch(newest)}`,
+  );
 });
 
 test('a directory that is not a git repository is labelled local-fs', async () => {

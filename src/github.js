@@ -116,11 +116,14 @@ async function request(path, { signal, token = getToken(), accept = 'application
  * @param {object} opts
  * @param {(p:{phase:string,detail?:string,progress?:number})=>void} [opts.onProgress]
  * @param {AbortSignal} [opts.signal]
- * @param {number} [opts.deepScan]  number of recent commits to open for
- *   file-level churn. 0 disables it. Each commit costs one request.
+ * @param {number} [opts.deepScan]  number of commits to open for file-level
+ *   churn. 0 disables it. Each commit costs one request.
+ * @param {boolean} [opts.spread]  spend that budget across the whole history
+ *   rather than on the newest commits. Costs extra listing requests, so it is
+ *   only worth offering to a caller with a token.
  */
 export async function fetchRepo(repo, opts = {}) {
-  const { onProgress = () => {}, signal, deepScan = 0 } = opts;
+  const { onProgress = () => {}, signal, deepScan = 0, spread = false } = opts;
   const slug = `${repo.owner}/${repo.name}`;
 
   onProgress({ phase: 'Locating repository', progress: 0.05 });
@@ -186,7 +189,7 @@ export async function fetchRepo(repo, opts = {}) {
   };
 
   if (deepScan > 0) {
-    await applyDeepScan(payload, slug, deepScan, { signal, onProgress });
+    await applyDeepScan(payload, slug, deepScan, { signal, onProgress, spread });
   }
 
   onProgress({ phase: 'Building the model', progress: 1 });
@@ -207,22 +210,34 @@ function normalizeActivity(weeks) {
  * request per commit. That cost is why main.js clamps the depth for
  * anonymous callers instead of replaying everything.
  */
-async function applyDeepScan(payload, slug, limit, { signal, onProgress }) {
+async function applyDeepScan(payload, slug, limit, { signal, onProgress, spread = false }) {
   onProgress({ phase: 'Listing commits', progress: 0.45 });
 
   // Page size must stay constant across requests: GitHub pages by offset, so
   // shrinking per_page on the last page re-requests commits already collected
   // and skips the tail. Over-fetch a whole page and trim instead.
   const PAGE = 100;
-  const shas = [];
-  const maxPages = Math.ceil(limit / PAGE);
-  for (let page = 1; shas.length < limit && page <= maxPages; page += 1) {
+  // Listing is a hundred commits per request; opening one for its file list is
+  // a request each. So walking further back than the budget costs almost
+  // nothing next to the budget itself, and it is the difference between
+  // replaying the newest four hundred commits of a ten-year repository and
+  // replaying four hundred spread across the ten years. Only offered to token
+  // holders: an anonymous caller has sixty requests an hour in total, and
+  // spending a third of them on listing is not a trade they can afford.
+  const maxPages = spread
+    ? Math.min(60, Math.max(4, Math.ceil(limit / 4)))
+    : Math.ceil(limit / PAGE);
+  const listed = [];
+  for (let page = 1; page <= maxPages; page += 1) {
+    if (!spread && listed.length >= limit) break;
     const list = await request(`/repos/${slug}/commits?per_page=${PAGE}&page=${page}`, { signal });
     if (!Array.isArray(list) || !list.length) break;
-    for (const c of list) if (c.sha) shas.push(c.sha);
+    for (const c of list) if (c.sha) listed.push(c.sha);
     if (list.length < PAGE) break;
   }
-  if (shas.length > limit) shas.length = limit;
+  // Without spread this stays exactly what it was: the newest `limit` commits,
+  // contiguous, no gaps.
+  const shas = spread ? pickCommits(listed, limit) : listed.slice(0, limit);
   if (!shas.length) return;
 
   const byPath = new Map(payload.files.map((f) => [f.path, f]));
@@ -276,7 +291,36 @@ async function applyDeepScan(payload, slug, limit, { signal, onProgress }) {
     const target = byPath.get(path);
     if (target) target.addedAt = when;
   }
-  payload.scan = { commits: done, partial: done < shas.length };
+  payload.scan = {
+    commits: done,
+    partial: done < shas.length,
+    spread: spread && listed.length > shas.length,
+    listed: listed.length,
+  };
+}
+
+/**
+ * Which of the listed commits to open, given a budget smaller than the list.
+ *
+ * The newest third of the budget is spent contiguously so recent history stays
+ * exact, and the rest is spread evenly over everything older. Recency is what a
+ * uniform sample is worst at, and it is what the heat in the viewer reads; the
+ * spread is what makes the growth timeline cover a repository's whole life
+ * rather than its last few weeks. Commits that add files turn up in every era,
+ * so sampling widely finds more creation dates than sampling deeply, not
+ * fewer: nothing here is approximated.
+ */
+function pickCommits(listed, limit) {
+  if (listed.length <= limit) return listed;
+  const recent = Math.min(Math.floor(limit / 3), listed.length);
+  const picked = listed.slice(0, recent);
+  const older = listed.length - recent;
+  const want = limit - recent;
+  if (want > 0 && older > 0) {
+    const step = older / want;
+    for (let i = 0; i < want; i += 1) picked.push(listed[recent + Math.floor(i * step)]);
+  }
+  return picked;
 }
 
 /** Current rate-limit headroom, for the HUD. */

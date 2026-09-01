@@ -98,7 +98,8 @@ reposense                        # scan . and open the viewer
 reposense ~/code/api --json      # write the JSON only, no browser
 reposense --svg docs/repo.svg    # render a static SVG
 reposense --no-history           # skip the git log pass (fast on huge repos)
-reposense -c 500                 # only the newest 500 commits
+reposense -c 500                 # diff 500 commits, still date them all
+reposense -c 500 --spread        # spend those 500 across the whole history
 ```
 
 The `reposense.json` it writes can be dropped straight onto the website: drag
@@ -148,7 +149,8 @@ out as vector. A repository of a few thousand files lands in about 25 KB.
 | `fps` | `30` | Frames per second, video only |
 | `seconds` | *(full tour)* | Video length; the whole tour runs about 54s |
 | `chrome` | `false` | Keep the HUD visible in video |
-| `commits` | *(all)* | Cap history at the newest N commits |
+| `commits` | *(all)* | Diff only N commits for churn; the timeline still spans everything |
+| `spread` | `false` | Spend that budget across the whole history, not its newest end |
 | `history` | `true` | `false` skips the git log pass entirely |
 | `json` | *(none)* | Also write the raw `reposense.json` here |
 | `commit` | `false` | Commit the result back to the branch |
@@ -319,9 +321,12 @@ A visualization that quietly invents data is worse than none. The rules here:
 - Sizes and structure are always real, straight from the git tree.
 - Churn, authorship and creation dates need history. The commit-list API does
   not return file lists, so the website's deep scan (on by default) opens
-  recent commits one request each to recover them, and the scrubber labels
-  exactly how many commits it covers. The CLI and the Action replay the
-  entire git log by default.
+  commits one request each to recover them, and the scrubber labels exactly
+  how many commits it covers. With a token the scan spreads those requests
+  over the whole history rather than its newest end. The CLI and the Action
+  replay the entire git log by default; when you cap them with `commits`, the
+  cap applies to the per-file diff pass alone, so the timeline still spans
+  every year the repository has.
 - When history is missing, Chronology is disabled and the panel explains why,
   rather than animating something meaningless.
 - On very large repositories the smallest files fold into `…N more files`

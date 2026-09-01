@@ -36,6 +36,7 @@ function parseArgs(argv) {
     dir: '.',
     out: 'reposense.json',
     commits: Infinity,
+    spread: false,
     history: true,
     serve: true,
     open: true,
@@ -52,6 +53,7 @@ function parseArgs(argv) {
     switch (a) {
       case '-o': case '--out': opts.out = argv[++i]; break;
       case '-c': case '--commits': opts.commits = Number(argv[++i]); break;
+      case '--spread': opts.spread = true; break;
       case '--no-history': opts.history = false; break;
       case '--json': opts.serve = false; opts.open = false; break;
       case '--serve': opts.serve = true; break;
@@ -91,7 +93,10 @@ Options
       --animate         svg builds itself in on a loop (CSS, no script)
       --theme <name>    svg theme: dark or light                 (default dark)
       --width <px>      svg width; height follows the ratio     (default 1280)
-  -c, --commits <n>     limit history to the newest n commits
+  -c, --commits <n>     diff only n commits for per-file churn; when each
+                        file first appeared is always read from the full log
+      --spread          spend that budget across the whole history rather
+                        than on the newest commits
       --no-history      skip git history entirely (much faster on huge repos)
       --json            write the JSON and exit; do not open the viewer
       --no-open         start the viewer but do not open a browser
@@ -103,16 +108,28 @@ Examples
   reposense                        scan the current repo and open the viewer
   reposense ~/code/api --json      write ~/code/api's data to reposense.json
   reposense --no-history           structure only, skip the git log pass
+  reposense -c 4000 --spread       bound the diff pass, still cover every year
   reposense --svg docs/repo.svg    render an SVG to embed in a README
   reposense --svg r.svg --animate  the same, but it builds itself in on a loop
 `;
 
 /* ─────────────────────────────────────────────────────────────────── git ── */
 
-/** Runs a git command and streams stdout line by line. */
-function gitLines(dir, args, onLine) {
+/**
+ * Runs a git command and streams stdout line by line. `input`, when given, is
+ * written to stdin: `git log --no-walk --stdin` takes its revision list that
+ * way, and a list of twenty thousand hashes is well past what an argv can hold.
+ */
+function gitLines(dir, args, onLine, input = null) {
   return new Promise((res, rej) => {
-    const child = spawn('git', args, { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('git', args, {
+      cwd: dir,
+      stdio: [input === null ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    });
+    if (input !== null) {
+      child.stdin.on('error', () => {}); // git closing early is not an error here
+      child.stdin.end(input);
+    }
     let stderr = '';
     child.stderr.on('data', (d) => {
       stderr += d;
@@ -214,61 +231,52 @@ async function walkFiles(dir) {
 /* ─────────────────────────────────────────────────────────────── history ── */
 
 /**
- * One pass over `git log --numstat` gives per-file churn, commit counts, author
- * attribution and last-touched times. A second pass restricted to additions
- * gives each file's creation date, which is what makes the growth timeline in
- * the viewer real rather than decorative.
+ * Replays the repository's history into per-file numbers.
+ *
+ * Three passes, because they do not cost remotely the same thing. Walking the
+ * commit list for dates and authors touches no trees at all; finding the
+ * commit that added each path compares trees but never opens a blob; counting
+ * changed lines per file has to read both sides of every diff. On express
+ * (5,678 commits) that is 50 ms, 160 ms and 2,214 ms respectively.
+ *
+ * So the first two always run over the whole history and only the third is
+ * ever bounded. That is what lets a bounded scan still say when every file
+ * appeared, which is the whole of the growth timeline in the viewer: the old
+ * single pass truncated the creation dates along with the churn, so asking
+ * for the newest 5,000 commits of a long-lived repository gave a chronology
+ * that started somewhere in the middle of last year.
  */
-async function collectHistory(dir, byPath, { commits, onProgress }) {
+async function collectHistory(dir, byPath, { commits, spread, onProgress }) {
   const activity = new Map(); // week start (unix seconds) -> commit count
   const authorCommits = new Map();
   let commitCount = 0;
-  let when = 0;
-  let author = '';
+  let firstCommit = 0;
+  let lastCommit = 0;
 
-  const limit = Number.isFinite(commits) ? ['-n', String(commits)] : [];
+  // 1. Dates and authors, over everything. No diff is computed here.
+  await gitLines(dir, ['log', '--no-merges', `--format=%ct${SEP}%aN`], (line) => {
+    const cut = line.indexOf(SEP);
+    if (cut === -1) return;
+    const when = Number(line.slice(0, cut)) || 0;
+    const author = line.slice(cut + 1);
+    commitCount += 1;
+    if (when) {
+      const week = when - (when % 604800);
+      activity.set(week, (activity.get(week) || 0) + 1);
+      if (!firstCommit || when < firstCommit) firstCommit = when;
+      if (when > lastCommit) lastCommit = when;
+    }
+    if (author) authorCommits.set(author, (authorCommits.get(author) || 0) + 1);
+    if (commitCount % 5000 === 0) onProgress?.(`${commitCount.toLocaleString()} commits dated…`);
+  });
 
-  await gitLines(
-    dir,
-    ['log', '--no-renames', '--numstat', '--no-merges', ...limit, `--format=${SEP}%ct${SEP}%aN`],
-    (line) => {
-      if (line.startsWith(SEP)) {
-        const parts = line.split(SEP);
-        when = Number(parts[1]) || 0;
-        author = parts[2] || '';
-        commitCount += 1;
-        if (when) {
-          const week = when - (when % 604800);
-          activity.set(week, (activity.get(week) || 0) + 1);
-        }
-        if (author) authorCommits.set(author, (authorCommits.get(author) || 0) + 1);
-        if (commitCount % 500 === 0) onProgress?.(commitCount);
-        return;
-      }
-      if (!line) return;
-      // "<added>\t<deleted>\t<path>"; binary files report "-" for both counts.
-      const tab1 = line.indexOf('\t');
-      const tab2 = line.indexOf('\t', tab1 + 1);
-      if (tab1 === -1 || tab2 === -1) return;
-      const target = byPath.get(line.slice(tab2 + 1));
-      if (!target) return; // touched historically but not present today
-
-      target.churn += (Number(line.slice(0, tab1)) || 0) + (Number(line.slice(tab1 + 1, tab2)) || 0);
-      target.commits += 1;
-      if (when > target.lastTouched) target.lastTouched = when;
-      if (author) {
-        target.authors = target.authors || {};
-        target.authors[author] = (target.authors[author] || 0) + 1;
-      }
-    },
-  );
-
-  // Creation dates. git log walks newest-first, so the last write per path wins
-  // and that is the earliest add, which is exactly what the growth timeline needs.
+  // 2. Creation dates, over everything. git log walks newest-first, so the
+  //    last write per path wins and that is the earliest add, which is exactly
+  //    what the growth timeline needs.
   let addWhen = 0;
   await gitLines(
     dir,
-    ['log', '--no-renames', '--diff-filter=A', '--name-only', ...limit, `--format=${SEP}%ct`],
+    ['log', '--no-renames', '--diff-filter=A', '--name-only', `--format=${SEP}%ct`],
     (line) => {
       if (line.startsWith(SEP)) {
         addWhen = Number(line.slice(1)) || 0;
@@ -280,7 +288,85 @@ async function collectHistory(dir, byPath, { commits, onProgress }) {
     },
   );
 
-  return { activity, authorCommits, commitCount };
+  // 3. Per-file churn. The expensive one, and the only one a budget applies to.
+  const budget = Number.isFinite(commits) ? Math.max(0, Math.floor(commits)) : Infinity;
+  const sampled = Number.isFinite(budget) && spread && budget < commitCount;
+  let scanned = commitCount;
+  let when = 0;
+  let author = '';
+
+  const onDiffLine = (line) => {
+    if (line.startsWith(SEP)) {
+      const parts = line.split(SEP);
+      when = Number(parts[1]) || 0;
+      author = parts[2] || '';
+      return;
+    }
+    if (!line) return;
+    // "<added>\t<deleted>\t<path>"; binary files report "-" for both counts.
+    const tab1 = line.indexOf('\t');
+    const tab2 = line.indexOf('\t', tab1 + 1);
+    if (tab1 === -1 || tab2 === -1) return;
+    const target = byPath.get(line.slice(tab2 + 1));
+    if (!target) return; // touched historically but not present today
+
+    target.churn += (Number(line.slice(0, tab1)) || 0) + (Number(line.slice(tab1 + 1, tab2)) || 0);
+    target.commits += 1;
+    if (when > target.lastTouched) target.lastTouched = when;
+    if (author) {
+      target.authors = target.authors || {};
+      target.authors[author] = (target.authors[author] || 0) + 1;
+    }
+  };
+
+  const format = `--format=${SEP}%ct${SEP}%aN`;
+  if (sampled) {
+    const picked = await pickSpread(dir, budget);
+    scanned = picked.length;
+    onProgress?.(`${scanned.toLocaleString()} commits across the whole history…`);
+    await gitLines(
+      dir,
+      ['log', '--no-renames', '--numstat', '--no-walk', '--stdin', format],
+      onDiffLine,
+      `${picked.join('\n')}\n`,
+    );
+  } else {
+    const limit = Number.isFinite(budget) ? ['-n', String(budget)] : [];
+    scanned = Number.isFinite(budget) ? Math.min(budget, commitCount) : commitCount;
+    onProgress?.(`${scanned.toLocaleString()} commits diffed…`);
+    await gitLines(dir, ['log', '--no-renames', '--numstat', '--no-merges', ...limit, format], onDiffLine);
+  }
+
+  return { activity, authorCommits, commitCount, scanned, sampled, firstCommit, lastCommit };
+}
+
+/**
+ * Chooses which commits to diff when the budget will not cover all of them.
+ *
+ * Not every Nth commit end to end. Recency is the one thing a uniform sample
+ * is bad at: a file whose last edit falls between two samples reads as colder
+ * than it is, and the heat in the viewer is a recency signal. So the newest
+ * third of the budget is spent contiguously, which keeps recent history exact,
+ * and the rest is spread evenly over everything older, which is what gives an
+ * old repository a chronology covering its whole life instead of its last few
+ * months.
+ */
+async function pickSpread(dir, budget) {
+  const shas = [];
+  await gitLines(dir, ['rev-list', '--no-merges', 'HEAD'], (line) => {
+    if (line) shas.push(line);
+  });
+  if (shas.length <= budget) return shas;
+
+  const recent = Math.min(Math.floor(budget / 3), shas.length);
+  const picked = shas.slice(0, recent);
+  const older = shas.length - recent;
+  const want = budget - recent;
+  if (want > 0 && older > 0) {
+    const step = older / want;
+    for (let i = 0; i < want; i += 1) picked.push(shas[recent + Math.floor(i * step)]);
+  }
+  return picked;
 }
 
 /* ───────────────────────────────────────────────────────────────── build ── */
@@ -310,9 +396,15 @@ async function buildPayload(opts, log) {
     try {
       history = await collectHistory(dir, byPath, {
         commits: opts.commits,
-        onProgress: (n) => log(`  ${n.toLocaleString()} commits…`, true),
+        spread: opts.spread,
+        onProgress: (msg) => log(`  ${msg}`, true),
       });
-      log(`Replayed ${history.commitCount.toLocaleString()} commits.`);
+      log(
+        history.scanned < history.commitCount
+          ? `Dated ${history.commitCount.toLocaleString()} commits, diffed ${history.scanned.toLocaleString()}` +
+              `${history.sampled ? ' across the whole history' : ' from the newest'}.`
+          : `Replayed ${history.commitCount.toLocaleString()} commits.`,
+      );
     } catch (err) {
       // An empty repository or a shallow clone should degrade, not abort.
       log(`History unavailable (${err.message}). Continuing with structure only.`);
@@ -362,7 +454,18 @@ async function buildPayload(opts, log) {
       ? [...history.activity.entries()].sort((a, b) => a[0] - b[0]).map(([week, commits]) => ({ week, commits }))
       : [],
     scan: history
-      ? { commits: history.commitCount, source: 'git log', limited: Number.isFinite(opts.commits) }
+      ? {
+          // `commits` is what the history covers, `diffed` is what was opened
+          // for per-file churn. They differ whenever a budget was set, and the
+          // viewer says which of the two it is describing.
+          commits: history.commitCount,
+          diffed: history.scanned,
+          source: 'git log',
+          limited: history.scanned < history.commitCount,
+          spread: history.sampled,
+          firstCommit: history.firstCommit,
+          lastCommit: history.lastCommit,
+        }
       : null,
     files,
   };
