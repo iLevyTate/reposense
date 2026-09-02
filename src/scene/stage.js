@@ -29,6 +29,21 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
+/**
+ * Seeded PRNG for anything that reaches a rendered frame. Math.random would
+ * give every machine, and every reload, a different sky, and the recording
+ * hook's contract is that one timestamp is one image everywhere.
+ */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export class Stage {
   constructor(container, labelLayer) {
     this.container = container;
@@ -214,6 +229,7 @@ export class Stage {
 
   #buildStarfield() {
     const COUNT = 3800;
+    const rand = mulberry32(0x5741b1ed);
     const positions = new Float32Array(COUNT * 3);
     const colors = new Float32Array(COUNT * 3);
     const sizes = new Float32Array(COUNT);
@@ -221,19 +237,19 @@ export class Stage {
 
     for (let i = 0; i < COUNT; i += 1) {
       // Uniform points on a shell, pushed far enough out to read as sky.
-      const u = Math.random() * 2 - 1;
-      const theta = Math.random() * Math.PI * 2;
-      const r = 1500 + Math.random() * 1900;
+      const u = rand() * 2 - 1;
+      const theta = rand() * Math.PI * 2;
+      const r = 1500 + rand() * 1900;
       const s = Math.sqrt(1 - u * u);
       positions[i * 3] = Math.cos(theta) * s * r;
       positions[i * 3 + 1] = u * r * 0.72;
       positions[i * 3 + 2] = Math.sin(theta) * s * r;
 
-      tint.setHSL(0.55 + Math.random() * 0.16, 0.55, 0.5 + Math.random() * 0.42);
+      tint.setHSL(0.55 + rand() * 0.16, 0.55, 0.5 + rand() * 0.42);
       colors[i * 3] = tint.r;
       colors[i * 3 + 1] = tint.g;
       colors[i * 3 + 2] = tint.b;
-      sizes[i] = Math.random() < 0.06 ? 5.5 : 1.2 + Math.random() * 2.2;
+      sizes[i] = rand() < 0.06 ? 5.5 : 1.2 + rand() * 2.2;
     }
 
     const geo = new THREE.BufferGeometry();
@@ -293,9 +309,18 @@ export class Stage {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
     this.labelRenderer.setSize(w, h);
+    // Sizing the composer sizes every pass it owns, at the drawing-buffer
+    // resolution (`width * pixelRatio`). The bloom must not be re-sized after
+    // it: passing CSS pixels rebuilt its whole mip chain at half resolution on
+    // a 2x display and left `invSize` describing a texel that no longer
+    // matched the one being sampled, so thin bright features (rim strips,
+    // window grids, tower crowns) aliased in the blur and crawled as the
+    // camera moved. It is invisible at devicePixelRatio 1, which is why CI
+    // never saw it.
     this.composer.setSize(w, h);
-    this.bloom.setSize(w, h);
     // FXAA needs the drawing-buffer size, which includes the pixel ratio.
+    // Unlike the bloom, ShaderPass does not implement setSize, so the
+    // composer cannot do this one.
     const dpr = this.renderer.getPixelRatio();
     this.fxaa.material.uniforms.resolution.value.set(1 / (w * dpr), 1 / (h * dpr));
   }

@@ -77,6 +77,26 @@ test('seeking is deterministic', async () => {
   assert.ok(a.equals(b), 'the same timestamp produced different pixels');
 });
 
+test('every shot seeks deterministically, however it was reached', async () => {
+  // Regression: the constellation's fade was accumulated per update() call
+  // instead of derived from the timestamp, so one moment of the People shot
+  // rendered differently the second time it was asked for, and a frame's
+  // content depended on which frame came before it. The check above only
+  // samples the opening shots, where nothing is mid-transition, so it passed
+  // throughout. One mark inside each shot covers every mode change.
+  await page.evaluate(() => window.__reposense.setChrome(false));
+  for (const t of [3, 10, 18, 25, 33, 42, 50]) {
+    const first = await seek(t);
+    const again = await seek(t);
+    assert.ok(first.equals(again), `t=${t} changed when asked for twice running`);
+
+    // The same moment, reached from the far end of the tour.
+    await seek(t > 27 ? 3 : 50);
+    const detoured = await seek(t);
+    assert.ok(detoured.equals(first), `t=${t} changed when reached from another shot`);
+  }
+});
+
 test('different timestamps render different frames', async () => {
   const early = await seek(2);
   const later = await seek(18);
