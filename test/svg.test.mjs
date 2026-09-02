@@ -88,12 +88,43 @@ test('themes produce different output but the same geometry', () => {
   assert.equal(renderSvg(payload, { theme: 'chartreuse' }), dark);
 });
 
-test('width drives the output size and the frame never becomes a column', () => {
+test('width drives the output size and the frame stays inside the ratio band', () => {
+  // 3:2 to 13:5. Anything narrower is a column in a README; anything wider is
+  // a letterbox slot with the drawing stranded in the middle of it.
   for (const width of [600, 1280, 2400]) {
     const { width: w, height: h } = attrs(renderSvg(payload, { width }));
     assert.equal(w, width);
     assert.ok(h > 0);
-    assert.ok(w / h >= 1.34, `ratio ${(w / h).toFixed(2)} is at least 1.35:1`);
+    assert.ok(w / h >= 1.49, `ratio ${(w / h).toFixed(2)} is at least 3:2`);
+    assert.ok(w / h <= 2.61, `ratio ${(w / h).toFixed(2)} is at most 13:5`);
+  }
+});
+
+test('the drawing is never stranded in an empty frame', () => {
+  // Regression: a width-proportional legend band under a 7:4 floor fed back on
+  // itself and widened the frame until the structure used half of it.
+  for (const files of [
+    payload.files,
+    Array.from({ length: 120 }, (_, i) => ({ path: `d${i % 10}/f${i}.ts`, size: 500 + i * 40 })),
+    Array.from({ length: 90 }, (_, i) => ({ path: `a/b/c/d/e/f${i % 7}/g${i}.py`, size: 800 + i * 30 })),
+  ]) {
+    const svg = renderSvg({ ...payload, files });
+    const [vx, , vw] = attrs(svg).viewBox;
+    let lo = Infinity;
+    let hi = -Infinity;
+    const seen = (x) => {
+      if (x < lo) lo = x;
+      if (x > hi) hi = x;
+    };
+    for (const m of svg.matchAll(/points="([^"]+)"/g)) {
+      for (const p of m[1].trim().split(/\s+/)) seen(Number(p.split(',')[0]));
+    }
+    for (const m of svg.matchAll(/ d="([^"]+)"/g)) {
+      for (const c of m[1].matchAll(/(-?[\d.]+) (-?[\d.]+)/g)) seen(Number(c[1]));
+    }
+    const used = (hi - lo) / vw;
+    assert.ok(used > 0.55, `drawing uses ${(used * 100).toFixed(0)}% of the frame width`);
+    assert.ok(lo - vx > 0, 'the drawing sits inside the frame');
   }
 });
 

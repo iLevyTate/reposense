@@ -144,6 +144,26 @@ test('deep scan attributes churn to the right commits', async () => {
   assert.equal(b.churn, 20 * 5);
 });
 
+test('a spread deep scan covers the history instead of its newest end', async () => {
+  // The stub holds 400 commits. Without spread the scan opens the newest 60
+  // and sees nothing older; with it, the same 60 requests reach the far end.
+  await fetchRepo({ owner: 'o', name: 'r' }, { deepScan: 60 });
+  const contiguous = requests.filter((r) => /\/commits\/sha\d+$/.test(r)).map((r) => Number(r.match(/sha(\d+)$/)[1]));
+
+  stubGitHub();
+  const payload = await fetchRepo({ owner: 'o', name: 'r' }, { deepScan: 60, spread: true });
+  const spread = requests.filter((r) => /\/commits\/sha\d+$/.test(r)).map((r) => Number(r.match(/sha(\d+)$/)[1]));
+
+  assert.equal(spread.length, 60, 'the budget is a budget, whichever commits it buys');
+  assert.equal(spread.length, new Set(spread).size, 'no commit is opened twice');
+  assert.ok(Math.max(...contiguous) <= 60, 'the contiguous scan stops at the newest 60');
+  assert.ok(Math.max(...spread) > 300, `the spread scan reaches the oldest commits, got ${Math.max(...spread)}`);
+  // The newest commits are still all opened, because recency is what a uniform
+  // sample is worst at and it is what the heat in the viewer reads.
+  for (let i = 1; i <= 20; i += 1) assert.ok(spread.includes(i), `commit ${i} is in the recent slice`);
+  assert.equal(payload.scan.spread, true);
+});
+
 test('deep scan limits that are not a multiple of the page size still work', async () => {
   for (const limit of [30, 150, 250]) {
     stubGitHub();

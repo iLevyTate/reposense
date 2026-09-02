@@ -55,10 +55,19 @@ inputs:
     default: 'false'
   commits:
     description: >-
-      Limit history to the newest N commits. Leave empty to replay all of it.
-      History supplies churn and authorship; it does not affect the structure.
+      Diff only N commits for per-file churn. Leave empty to diff all of them.
+      Dating the history and finding when each file first appeared are cheap
+      passes that always run over everything, so a budget here costs churn
+      detail, never the span of the timeline. Structure is unaffected.
     required: false
     default: ''
+  spread:
+    description: >-
+      Set to 'true' to spend the `commits` budget across the whole history
+      rather than on the newest commits. The newest third stays contiguous so
+      recent churn is exact; the rest is sampled evenly over everything older.
+    required: false
+    default: 'false'
   history:
     description: Set to 'false' to skip the git log pass entirely (much faster on huge repos).
     required: false
@@ -113,6 +122,7 @@ runs:
         RS_CHROME: ${{ inputs.chrome }}
         RS_ANIMATE: ${{ inputs.animate }}
         RS_COMMITS: ${{ inputs.commits }}
+        RS_SPREAD: ${{ inputs.spread }}
         RS_HISTORY: ${{ inputs.history }}
         RS_JSON: ${{ inputs.json }}
       run: |
@@ -143,6 +153,9 @@ runs:
         scan=("$RS_PATH" --out "$json_path")
         if [ -n "$RS_COMMITS" ]; then
           scan+=(--commits "$RS_COMMITS")
+        fi
+        if [ "$RS_SPREAD" = "true" ]; then
+          scan+=(--spread)
         fi
         if [ "$RS_HISTORY" = "false" ]; then
           scan+=(--no-history)
