@@ -86,9 +86,34 @@ test('--commits bounds the diff pass without truncating the timeline', async () 
   assert.equal(firstAdd(bounded), firstAdd(full), 'creation dates reach as far back as ever');
 });
 
+/**
+ * Builds a repository whose history shape is fully controlled: `count` commits,
+ * each touching its own still-present file, spaced a week apart.
+ */
+async function historyFixture(count) {
+  const dir = await mkdtemp(join(tmpdir(), 'reposense-hist-'));
+  const git = (args, env = {}) => run('git', args, { cwd: dir, env: { ...process.env, ...env } });
+  await git(['init', '-q']);
+  await git(['config', 'user.email', 'fixture@example.invalid']);
+  await git(['config', 'user.name', 'Fixture']);
+  for (let i = 1; i <= count; i += 1) {
+    await writeFile(join(dir, `file-${String(i).padStart(2, '0')}.js`), `export const v = ${i};\n`);
+    const when = `${1600000000 + i * 604800} +0000`;
+    await git(['add', '.']);
+    await git(['commit', '-q', '-m', `c${i}`], { GIT_AUTHOR_DATE: when, GIT_COMMITTER_DATE: when });
+  }
+  return dir;
+}
+
 test('--spread samples the diff pass across the whole history', async () => {
-  const newest = await scan(ROOT, ['--commits', '4']);
-  const spread = await scan(ROOT, ['--commits', '4', '--spread']);
+  // Not run against this repository: lastTouched is only recorded for files
+  // that still exist, so the reach-back comparison below depends on the shape
+  // the live history happens to have, and a tip commit touching most files (a
+  // merge, the CI bot refreshing the SVGs) collapses the difference between
+  // the two samples. One commit per still-present file makes it deterministic.
+  const dir = await historyFixture(12);
+  const newest = await scan(dir, ['--commits', '4']);
+  const spread = await scan(dir, ['--commits', '4', '--spread']);
 
   assert.equal(spread.scan.spread, true);
   assert.equal(newest.scan.spread, false);
@@ -101,6 +126,7 @@ test('--spread samples the diff pass across the whole history', async () => {
     oldestTouch(spread) < oldestTouch(newest),
     `spread reaches back to ${oldestTouch(spread)}, newest-first only to ${oldestTouch(newest)}`,
   );
+  await rm(dir, { recursive: true, force: true });
 });
 
 test('a directory that is not a git repository is labelled local-fs', async () => {

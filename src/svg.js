@@ -420,7 +420,12 @@ export function renderSvg(payload, opts = {}) {
   for (const f of layout.files) {
     const y0 = f.ring * LIFT;
     const y1 = y0 + f.height;
-    const w = Math.max(0.7, f.footprint * 0.5);
+    // Half-width, bounded by the cell the tower stands in. The footprint alone
+    // is not enough: the footprint is an axis-aligned square, so at an off-axis
+    // angle its diagonal reaches 1.41x the half-width and neighbours in a dense
+    // district merge into one serrated ribbon. Bounding by the cell keeps a
+    // visible gap between every pair of buildings at any angle.
+    const w = Math.max(0.26, Math.min(f.footprint * 0.5, f.cell * 0.33));
     const ca = Math.cos(f.aMid);
     const sa = Math.sin(f.aMid);
     // Axis-aligned footprint keeps the polygon count at three faces per tower.

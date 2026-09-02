@@ -932,7 +932,12 @@ export class Arcology {
           uniform vec3 uColor;
           varying float vY;
           void main() {
-            float fade = pow(1.0 - vY, 1.5);
+            // max() before pow, for the same reason as the tower fresnel:
+            // vY is interpolated across the column and can land a float ulp
+            // above 1.0, pow() of a negative base is NaN, and this material
+            // is additive, so one NaN fragment poisons the buffer the bloom
+            // then blurs across the whole frame as white.
+            float fade = pow(max(1.0 - vY, 0.0), 1.5);
             float scan = 0.55 + 0.45 * sin(uTime * 4.0 - vY * 14.0);
             gl_FragColor = vec4(uColor * (0.8 + scan), fade * 0.55);
           }`,

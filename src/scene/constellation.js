@@ -13,6 +13,9 @@ import { LIFT } from '../layout.js';
 import { colorOf, hexToRgb } from '../palette.js';
 
 const PER_RING = 6;
+/** Reveal speed, in units of reveal per second: a full fade takes ~0.38s. */
+const REVEAL_RATE = 2.6;
+const FADE_SECONDS = 1 / REVEAL_RATE;
 
 export class Constellation {
   constructor(model, layout) {
@@ -22,11 +25,14 @@ export class Constellation {
     this.group.visible = false;
     this.uniforms = { uTime: { value: 0 }, uReveal: { value: 0 } };
     this.nodes = [];
-    // Mode changes ease in and out rather than snapping; `reveal` chases
-    // `targetReveal` in update(), driven by dt so the offline recorder's
-    // fixed-step frames land on the same values every render.
+    // Mode changes ease in and out rather than snapping. The eased value is
+    // derived in update() from how much scene time has passed since the
+    // switch, never accumulated across calls (see the note in update).
     this.reveal = 0;
     this.targetReveal = 0;
+    this.revealFrom = 0;
+    this.revealAt = null;
+    this.lastUpdate = null;
 
     // Orbits are sized from the structure so contributors circle the repository
     // at a readable distance whether it is a script or a monorepo.
@@ -239,17 +245,40 @@ export class Constellation {
   }
 
   setVisible(v) {
-    this.targetReveal = v ? 1 : 0;
     if (v) this.group.visible = true; // the fade-out hides it when it lands
+    const target = v ? 1 : 0;
+    if (target === this.targetReveal) return;
+    this.targetReveal = target;
+    // Start from wherever the last transition got to, so switching back
+    // mid-fade is continuous rather than a jump. The anchor is taken on the
+    // next update(), which is the first place the scene time is known.
+    this.revealFrom = this.reveal;
+    this.revealAt = null;
   }
 
   update(dt, time) {
-    // Chase the target, then apply the eased value everywhere at once.
-    if (this.reveal !== this.targetReveal) {
-      const step = dt * 2.6;
-      this.reveal = this.reveal < this.targetReveal
-        ? Math.min(this.targetReveal, this.reveal + step)
-        : Math.max(this.targetReveal, this.reveal - step);
+    // The fade is a pure function of the timestamp. It used to add `dt * rate`
+    // to a stored value on every call, which made it a function of how many
+    // frames had been drawn instead: the fade ran twice as long at 30fps as at
+    // 60, and asking the offline recorder for one timestamp twice returned two
+    // different images, because the second ask advanced the state again. Both
+    // are the same defect, and both showed up as the constellation flickering
+    // through its own transition.
+    const last = this.lastUpdate;
+    this.lastUpdate = time;
+    if (this.revealAt === null) this.revealAt = time;
+    if (last === null || time < last || time - last > FADE_SECONDS) {
+      // Scene time jumped: a scrub, a seek between shots, a tab coming back
+      // from the background. There is no elapsed time to ease over, so the
+      // transition settles rather than freezing part-way. Leaving it part-way
+      // is what made one timestamp render differently depending on which
+      // timestamp had been asked for before it.
+      this.reveal = this.targetReveal;
+      this.revealFrom = this.targetReveal;
+      this.revealAt = time;
+    } else {
+      const k = Math.min(1, Math.max(0, (time - this.revealAt) * REVEAL_RATE));
+      this.reveal = this.revealFrom + (this.targetReveal - this.revealFrom) * k;
     }
     if (this.reveal <= 0 && this.targetReveal === 0) {
       this.group.visible = false;
