@@ -1006,7 +1006,15 @@ function boot() {
 function hasWebGL() {
   try {
     const canvas = document.createElement('canvas');
-    return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    if (!gl) return false;
+    // Hand the context back instead of leaving it to the garbage collector.
+    // A browser keeps only a small number of live WebGL contexts and drops the
+    // oldest one when it runs out, so a probe that outlives its own answer is
+    // competing with the renderer it exists to clear the way for. That matters
+    // most on a first load, when the GPU process is still starting up.
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return true;
   } catch {
     return false;
   }

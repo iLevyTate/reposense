@@ -149,7 +149,14 @@ export class Stage {
     this._fastFrames = 0;
     this._scaleCooldown = 0;
 
-    this._onResize = () => this.resize();
+    // Resizing the drawing buffer throws its contents away, so every resize is
+    // deferred to the top of a frame rather than run where it was asked for.
+    // See the note in start().
+    this._needsResize = false;
+    this._onResize = () => {
+      if (this.running) this._needsResize = true;
+      else this.resize();
+    };
     addEventListener('resize', this._onResize);
     this.resize();
   }
@@ -179,12 +186,12 @@ export class Stage {
     }
     if (this._slowFrames > 45 && this.renderScale > 0.5) {
       this.renderScale = Math.max(0.5, this.renderScale * 0.8);
-      this.#applyPixelRatio();
+      this._needsResize = true;
       this._slowFrames = 0;
       this._scaleCooldown = time + 1.5;
     } else if (this._fastFrames > 240 && this.renderScale < 1) {
       this.renderScale = Math.min(1, this.renderScale / 0.8);
-      this.#applyPixelRatio();
+      this._needsResize = true;
       this._fastFrames = 0;
       this._scaleCooldown = time + 1.5;
     }
@@ -331,6 +338,19 @@ export class Stage {
     const loop = () => {
       if (!this.running) return;
       this.frame = requestAnimationFrame(loop);
+      // Every resize lands here, at the top of a frame, never where it was
+      // asked for. Reallocating the drawing buffer discards its contents, and
+      // the adaptive controller used to do that after composer.render(), as
+      // the last statement of the callback, so the browser had a buffer to
+      // composite that nothing had drawn into. What such a buffer shows is
+      // undefined and up to the driver. The controller trips after 45
+      // sustained slow frames, which is what a first load looks like while
+      // shaders compile and the structure builds; a warm reload never gets
+      // slow enough to trip it.
+      if (this._needsResize) {
+        this._needsResize = false;
+        this.#applyPixelRatio();
+      }
       const dt = Math.min(this.clock.getDelta(), 0.05);
       const t = this.clock.elapsedTime;
       this.starfield.userData.material.uniforms.uTime.value = t;
@@ -372,7 +392,8 @@ export class Stage {
     this.maxPixelRatio = Math.min(devicePixelRatio || 1, ratios[level] ?? 1.5);
     this.renderScale = 1;
     this.bloom.enabled = level !== 'performance';
-    this.#applyPixelRatio();
+    if (this.running) this._needsResize = true;
+    else this.#applyPixelRatio();
   }
 
   dispose() {
