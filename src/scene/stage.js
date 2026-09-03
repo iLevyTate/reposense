@@ -127,9 +127,28 @@ export class Stage {
           // falloff. It focuses the eye without reading as a dark frame.
           float d = length(vUv - 0.5) * 1.35;
           c.rgb *= 1.0 - 0.16 * smoothstep(0.5, 1.05, d);
+          // One noise field was doing two jobs that want opposite things, and
+          // the sky lost the argument. Grain has to move to read as grain;
+          // dither has to hold still or it is flicker. They are separate now.
+          //
+          // Film grain: animated, and confined to the midtones and highlights.
+          // At flat amplitude it was 0.016 of full scale everywhere, which is
+          // nothing on a lit tower at 200 of 255 and a 14% swing on sky at 21,
+          // so the darkest part of the frame carried the loudest grain. The
+          // 24fps quantisation then held each field for two or three frames
+          // before jumping, and that read as the sky flickering, worst in a
+          // portrait viewport where the top of the frame is only sky.
+          float gLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
           float frame = floor(uTime * 24.0);
           float g = hash(gl_FragCoord.xy * 0.7311 + fract(frame * 0.1031) * vec2(173.0, 591.0));
-          c.rgb += (g - 0.5) * uGrain;
+          c.rgb += (g - 0.5) * uGrain * smoothstep(0.05, 0.6, gLum);
+          // Dither: fixed in screen space, so it never flickers however long
+          // the frame is held. It is here because the sky needs it. Horizon to
+          // zenith spans about 25 of the 255 levels, so without a dither that
+          // ramp quantises into bands tens of pixels deep. Roughly one level,
+          // which is the usual amount, and below the threshold of sight on
+          // every surface that does not need it.
+          c.rgb += (hash(gl_FragCoord.xy * 1.7137 + 19.0) - 0.5) * (1.2 / 255.0);
           gl_FragColor = c;
         }`,
     });
