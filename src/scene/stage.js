@@ -237,9 +237,14 @@ export class Stage {
   #buildStarfield() {
     const COUNT = 3800;
     const rand = mulberry32(0x5741b1ed);
+    // Twinkle is drawn from its own stream so that adding it left every star
+    // exactly where it already was.
+    const twinkleRand = mulberry32(0x1f83d9ab);
     const positions = new Float32Array(COUNT * 3);
     const colors = new Float32Array(COUNT * 3);
     const sizes = new Float32Array(COUNT);
+    // Per star: the phase it starts at and the rate it runs at.
+    const twinkle = new Float32Array(COUNT * 2);
     const tint = new THREE.Color();
 
     for (let i = 0; i < COUNT; i += 1) {
@@ -257,12 +262,16 @@ export class Stage {
       colors[i * 3 + 1] = tint.g;
       colors[i * 3 + 2] = tint.b;
       sizes[i] = rand() < 0.06 ? 5.5 : 1.2 + rand() * 2.2;
+
+      twinkle[i * 2] = twinkleRand() * Math.PI * 2;
+      twinkle[i * 2 + 1] = 0.45 + twinkleRand() * 0.95;
     }
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+    geo.setAttribute('aTwinkle', new THREE.BufferAttribute(twinkle, 2));
 
     const mat = new THREE.ShaderMaterial({
       transparent: true,
@@ -271,13 +280,24 @@ export class Stage {
       uniforms: { uTime: { value: 0 }, uPixelRatio: { value: Math.min(devicePixelRatio || 1, 2) } },
       vertexShader: `
         attribute float aSize;
+        attribute vec2 aTwinkle;
         varying vec3 vColor;
         varying float vTwinkle;
         uniform float uTime;
         uniform float uPixelRatio;
         void main() {
           vColor = color;
-          vTwinkle = 0.72 + 0.28 * sin(uTime * 0.8 + position.x * 0.01 + position.z * 0.013);
+          // Phase and rate are per star. They used to come from the star's own
+          // position, which made the phase a smooth function of where a star
+          // sat: the field laid about 17 alternating bright and dim bands
+          // across the sky and swept them past the camera once every 7.85
+          // seconds. Neighbouring stars are a median 166 units apart against a
+          // 383-unit wavelength, so they rose and fell together and the sky
+          // pulsed as one surface instead of scintillating. Independent phases
+          // drop the correlation between neighbours from 0.25 to zero, and
+          // independent rates leave no single frequency for the eye to lock
+          // onto.
+          vTwinkle = 0.72 + 0.28 * sin(uTime * aTwinkle.y + aTwinkle.x);
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
           gl_PointSize = aSize * uPixelRatio * (900.0 / -mv.z);
