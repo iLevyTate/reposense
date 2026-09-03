@@ -127,9 +127,28 @@ export class Stage {
           // falloff. It focuses the eye without reading as a dark frame.
           float d = length(vUv - 0.5) * 1.35;
           c.rgb *= 1.0 - 0.16 * smoothstep(0.5, 1.05, d);
+          // One noise field was doing two jobs that want opposite things, and
+          // the sky lost the argument. Grain has to move to read as grain;
+          // dither has to hold still or it is flicker. They are separate now.
+          //
+          // Film grain: animated, and confined to the midtones and highlights.
+          // At flat amplitude it was 0.016 of full scale everywhere, which is
+          // nothing on a lit tower at 200 of 255 and a 14% swing on sky at 21,
+          // so the darkest part of the frame carried the loudest grain. The
+          // 24fps quantisation then held each field for two or three frames
+          // before jumping, and that read as the sky flickering, worst in a
+          // portrait viewport where the top of the frame is only sky.
+          float gLum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
           float frame = floor(uTime * 24.0);
           float g = hash(gl_FragCoord.xy * 0.7311 + fract(frame * 0.1031) * vec2(173.0, 591.0));
-          c.rgb += (g - 0.5) * uGrain;
+          c.rgb += (g - 0.5) * uGrain * smoothstep(0.05, 0.6, gLum);
+          // Dither: fixed in screen space, so it never flickers however long
+          // the frame is held. It is here because the sky needs it. Horizon to
+          // zenith spans about 25 of the 255 levels, so without a dither that
+          // ramp quantises into bands tens of pixels deep. Roughly one level,
+          // which is the usual amount, and below the threshold of sight on
+          // every surface that does not need it.
+          c.rgb += (hash(gl_FragCoord.xy * 1.7137 + 19.0) - 0.5) * (1.2 / 255.0);
           gl_FragColor = c;
         }`,
     });
@@ -149,7 +168,14 @@ export class Stage {
     this._fastFrames = 0;
     this._scaleCooldown = 0;
 
-    this._onResize = () => this.resize();
+    // Resizing the drawing buffer throws its contents away, so every resize is
+    // deferred to the top of a frame rather than run where it was asked for.
+    // See the note in start().
+    this._needsResize = false;
+    this._onResize = () => {
+      if (this.running) this._needsResize = true;
+      else this.resize();
+    };
     addEventListener('resize', this._onResize);
     this.resize();
   }
@@ -179,12 +205,12 @@ export class Stage {
     }
     if (this._slowFrames > 45 && this.renderScale > 0.5) {
       this.renderScale = Math.max(0.5, this.renderScale * 0.8);
-      this.#applyPixelRatio();
+      this._needsResize = true;
       this._slowFrames = 0;
       this._scaleCooldown = time + 1.5;
     } else if (this._fastFrames > 240 && this.renderScale < 1) {
       this.renderScale = Math.min(1, this.renderScale / 0.8);
-      this.#applyPixelRatio();
+      this._needsResize = true;
       this._fastFrames = 0;
       this._scaleCooldown = time + 1.5;
     }
@@ -230,9 +256,14 @@ export class Stage {
   #buildStarfield() {
     const COUNT = 3800;
     const rand = mulberry32(0x5741b1ed);
+    // Twinkle is drawn from its own stream so that adding it left every star
+    // exactly where it already was.
+    const twinkleRand = mulberry32(0x1f83d9ab);
     const positions = new Float32Array(COUNT * 3);
     const colors = new Float32Array(COUNT * 3);
     const sizes = new Float32Array(COUNT);
+    // Per star: the phase it starts at and the rate it runs at.
+    const twinkle = new Float32Array(COUNT * 2);
     const tint = new THREE.Color();
 
     for (let i = 0; i < COUNT; i += 1) {
@@ -250,12 +281,16 @@ export class Stage {
       colors[i * 3 + 1] = tint.g;
       colors[i * 3 + 2] = tint.b;
       sizes[i] = rand() < 0.06 ? 5.5 : 1.2 + rand() * 2.2;
+
+      twinkle[i * 2] = twinkleRand() * Math.PI * 2;
+      twinkle[i * 2 + 1] = 0.45 + twinkleRand() * 0.95;
     }
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+    geo.setAttribute('aTwinkle', new THREE.BufferAttribute(twinkle, 2));
 
     const mat = new THREE.ShaderMaterial({
       transparent: true,
@@ -264,13 +299,24 @@ export class Stage {
       uniforms: { uTime: { value: 0 }, uPixelRatio: { value: Math.min(devicePixelRatio || 1, 2) } },
       vertexShader: `
         attribute float aSize;
+        attribute vec2 aTwinkle;
         varying vec3 vColor;
         varying float vTwinkle;
         uniform float uTime;
         uniform float uPixelRatio;
         void main() {
           vColor = color;
-          vTwinkle = 0.72 + 0.28 * sin(uTime * 0.8 + position.x * 0.01 + position.z * 0.013);
+          // Phase and rate are per star. They used to come from the star's own
+          // position, which made the phase a smooth function of where a star
+          // sat: the field laid about 17 alternating bright and dim bands
+          // across the sky and swept them past the camera once every 7.85
+          // seconds. Neighbouring stars are a median 166 units apart against a
+          // 383-unit wavelength, so they rose and fell together and the sky
+          // pulsed as one surface instead of scintillating. Independent phases
+          // drop the correlation between neighbours from 0.25 to zero, and
+          // independent rates leave no single frequency for the eye to lock
+          // onto.
+          vTwinkle = 0.72 + 0.28 * sin(uTime * aTwinkle.y + aTwinkle.x);
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
           gl_PointSize = aSize * uPixelRatio * (900.0 / -mv.z);
@@ -331,6 +377,19 @@ export class Stage {
     const loop = () => {
       if (!this.running) return;
       this.frame = requestAnimationFrame(loop);
+      // Every resize lands here, at the top of a frame, never where it was
+      // asked for. Reallocating the drawing buffer discards its contents, and
+      // the adaptive controller used to do that after composer.render(), as
+      // the last statement of the callback, so the browser had a buffer to
+      // composite that nothing had drawn into. What such a buffer shows is
+      // undefined and up to the driver. The controller trips after 45
+      // sustained slow frames, which is what a first load looks like while
+      // shaders compile and the structure builds; a warm reload never gets
+      // slow enough to trip it.
+      if (this._needsResize) {
+        this._needsResize = false;
+        this.#applyPixelRatio();
+      }
       const dt = Math.min(this.clock.getDelta(), 0.05);
       const t = this.clock.elapsedTime;
       this.starfield.userData.material.uniforms.uTime.value = t;
@@ -372,7 +431,8 @@ export class Stage {
     this.maxPixelRatio = Math.min(devicePixelRatio || 1, ratios[level] ?? 1.5);
     this.renderScale = 1;
     this.bloom.enabled = level !== 'performance';
-    this.#applyPixelRatio();
+    if (this.running) this._needsResize = true;
+    else this.#applyPixelRatio();
   }
 
   dispose() {
