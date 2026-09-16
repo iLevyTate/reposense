@@ -198,6 +198,23 @@ renders a video player for files uploaded through its own comment or release
 attachments. Use them for release notes, issues, and social posts, and link
 to them from the README.
 
+### A vertical cut
+
+`scripts/promo.mjs` films the site at a phone viewport and cuts a 9:16 video
+for a social post. Three beats: the launch screen with a repository typed
+into it, the tour with the mobile HUD left visible, and the address over the
+closing shot.
+
+```bash
+node scripts/reposense.mjs . --json --out reposense.json
+node scripts/promo.mjs --data reposense.json --out promo.mp4
+```
+
+It needs playwright and an ffmpeg built with H.264. `--speed` sets how much
+of the 54 second tour the cut compresses (1.08 lands it at 50 seconds),
+`--css-width` the phone width the site is laid out at, and `--no-intro` or
+`--no-end-card` drop those beats for a clean scene-only version.
+
 ### Put it in your README
 
 The rendered SVG is a few dozen kilobytes and refreshes itself on every push:
@@ -360,6 +377,7 @@ src/
   ui/hud.js           panels, inspector, tooltip, toasts
 scripts/reposense.mjs the local scanner (zero dependencies)
 scripts/record.mjs    offline recorder: tour -> gif / mp4 / webm / webp
+scripts/promo.mjs     9:16 phone cut for social posts
 action.yml            the GitHub Action
 vendor/three/         three.js, vendored so there is no CDN dependency
 ```

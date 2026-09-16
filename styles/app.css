@@ -71,7 +71,10 @@ code, kbd, .mono { font-family: var(--mono); }
 
 .launch-inner {
   position: relative; z-index: 1;
-  width: min(680px, 100%);
+  /* A grid item's automatic minimum is its min-content width, and the input
+     row's is wider than a phone. Without this the whole column sits wider
+     than the viewport and the text clips off the right edge. */
+  width: min(680px, 100%); min-width: 0;
   text-align: center;
   animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
