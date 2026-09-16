@@ -48,6 +48,7 @@ Options
   --css-width <px>  phone width the site is laid out at      (default 405)
   --fps <n>         frames per second                         (default 30)
   --speed <n>       tour playback rate; 1.08 fits 54s into 50 (default 1.08)
+  --start <n>       seconds of the tour to skip                (default 2.4)
   --repo <text>     what the intro types                (default: the data's)
   --url <text>      the end card's address    (default ilevytate.github.io/…)
   --no-intro        start on the tour
@@ -64,6 +65,7 @@ function parseArgs(argv) {
     cssWidth: 405,
     fps: 30,
     speed: 1.08,
+    start: 2.4,
     intro: true,
     endCard: true,
     ffmpeg: 'ffmpeg',
@@ -78,6 +80,7 @@ function parseArgs(argv) {
       case '--css-width': o.cssWidth = Number(argv[++i]); break;
       case '--fps': o.fps = Number(argv[++i]); break;
       case '--speed': o.speed = Number(argv[++i]); break;
+      case '--start': o.start = Number(argv[++i]); break;
       case '--repo': o.repo = argv[++i]; break;
       case '--url': o.url = argv[++i]; break;
       case '--no-intro': o.intro = false; break;
@@ -249,7 +252,7 @@ async function filmIntro(page, url, { repo, fps, frame, log }) {
  * Beat two and three: the tour, with the HUD left on so the video is the app
  * and not only the scene, and the end card faded over the closing shot.
  */
-async function filmTour(page, url, { fps, speed, endCard, urlText, frame, log }) {
+async function filmTour(page, url, { fps, speed, start, endCard, urlText, frame, log }) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#viewer:not([hidden])', { timeout: 120000 });
   await page.waitForFunction(() => document.documentElement.dataset.recordReady === '1', { timeout: 120000 });
@@ -287,14 +290,18 @@ async function filmTour(page, url, { fps, speed, endCard, urlText, frame, log })
   }
 
   const duration = await page.evaluate(() => window.__reposense.duration);
-  const total = Math.max(1, Math.round((duration / speed) * fps));
+  // The tour opens a long way out, which reads as a distant speck on a phone
+  // and wastes the seconds that decide whether anyone keeps watching. Skipping
+  // into the approach starts the cut on a structure already worth looking at,
+  // with the rest of the push-in still to come.
+  const total = Math.max(1, Math.round(((duration - start) / speed) * fps));
   // The card rides the closing pull-back, which is the only shot with no
   // caption of its own to collide with.
   const cardIn = total - Math.round(4.2 * fps);
-  log(`  tour: ${total} frames (${(duration / speed).toFixed(1)}s at ${speed}x)`);
+  log(`  tour: ${total} frames (${((duration - start) / speed).toFixed(1)}s at ${speed}x)`);
 
   for (let i = 0; i < total; i += 1) {
-    const t = (i / fps) * speed;
+    const t = start + (i / fps) * speed;
     await page.evaluate((time) => window.__reposense.seek(time), t);
     if (endCard) {
       const p = Math.min(1, Math.max(0, (i - cardIn) / (0.9 * fps)));
@@ -371,6 +378,7 @@ async function main() {
     await filmTour(page, `http://127.0.0.1:${port}/?record=1#/local`, {
       fps: opts.fps,
       speed: opts.speed,
+      start: opts.start,
       endCard: opts.endCard,
       urlText,
       frame,
