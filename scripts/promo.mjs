@@ -49,6 +49,10 @@ Options
   --fps <n>         frames per second                         (default 30)
   --speed <n>       tour playback rate; 1.08 fits 54s into 50 (default 1.08)
   --start <n>       seconds of the tour to skip                (default 2.4)
+  --cut <a-b,c-d>   film only these stretches of the tour, in seconds, and
+                    hard cut between them; overrides --start
+  --intro <n>       length of the launch screen beat            (default 2.2)
+  --card-lead <n>   seconds of end card before the finish       (default 4.2)
   --repo <text>     what the intro types                (default: the data's)
   --url <text>      the end card's address    (default ilevytate.github.io/…)
   --no-intro        start on the tour
@@ -66,6 +70,8 @@ function parseArgs(argv) {
     fps: 30,
     speed: 1.08,
     start: 2.4,
+    introSeconds: 2.2,
+    cardLead: 4.2,
     intro: true,
     endCard: true,
     ffmpeg: 'ffmpeg',
@@ -81,6 +87,9 @@ function parseArgs(argv) {
       case '--fps': o.fps = Number(argv[++i]); break;
       case '--speed': o.speed = Number(argv[++i]); break;
       case '--start': o.start = Number(argv[++i]); break;
+      case '--cut': o.cut = parseCut(argv[++i]); break;
+      case '--intro': o.introSeconds = Number(argv[++i]); break;
+      case '--card-lead': o.cardLead = Number(argv[++i]); break;
       case '--repo': o.repo = argv[++i]; break;
       case '--url': o.url = argv[++i]; break;
       case '--no-intro': o.intro = false; break;
@@ -92,6 +101,19 @@ function parseArgs(argv) {
     }
   }
   return o;
+}
+
+/** "3-11,29-39" becomes [[3, 11], [29, 39]], in tour seconds. */
+function parseCut(spec) {
+  const out = (spec ?? '').split(',').filter(Boolean).map((part) => {
+    const [a, b] = part.split('-').map(Number);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) {
+      throw new Error(`Bad --cut segment "${part}". Write it as start-end in seconds.`);
+    }
+    return [a, b];
+  });
+  if (!out.length) throw new Error('--cut needs at least one start-end segment.');
+  return out;
 }
 
 const MIME = {
@@ -176,7 +198,7 @@ const easeOut = (t) => 1 - (1 - t) ** 3;
  * would sample its ambient drift at whatever rate this machine screenshots,
  * which plays back as a stutter rather than as drift.
  */
-async function filmIntro(page, url, { repo, fps, frame, log }) {
+async function filmIntro(page, url, { repo, fps, seconds, frame, log }) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#launch:not([hidden])');
   // Let the entrance animation land before freezing anything.
@@ -204,17 +226,21 @@ async function filmIntro(page, url, { repo, fps, frame, log }) {
     document.getElementById('repo-input').focus();
   });
 
-  const beats = [
+  // Weights, not seconds: a Shorts cut wants the same three moments in half
+  // the time, so the beat holds scale to whatever length is asked for.
+  const weights = [
     { hold: 0.45, typed: 0 },
     ...Array.from({ length: repo.length }, (_, i) => ({ hold: 0.045, typed: i + 1 })),
     { hold: 0.55, typed: repo.length },
     { hold: 0.5, typed: repo.length, tap: true },
   ];
-  const total = beats.reduce((s, b) => s + Math.round(b.hold * fps), 0);
+  const natural = weights.reduce((sum, b) => sum + b.hold, 0);
+  const beats = weights.map((b) => ({ ...b, hold: (b.hold * seconds) / natural }));
+  const total = beats.reduce((sum, b) => sum + Math.max(1, Math.round(b.hold * fps)), 0);
 
   let i = 0;
   for (const beat of beats) {
-    const count = Math.round(beat.hold * fps);
+    const count = Math.max(1, Math.round(beat.hold * fps));
     for (let k = 0; k < count; k += 1) {
       const p = i / Math.max(1, total - 1);
       await page.evaluate(({ text, scale, tap }) => {
@@ -252,7 +278,7 @@ async function filmIntro(page, url, { repo, fps, frame, log }) {
  * Beat two and three: the tour, with the HUD left on so the video is the app
  * and not only the scene, and the end card faded over the closing shot.
  */
-async function filmTour(page, url, { fps, speed, start, endCard, urlText, frame, log }) {
+async function filmTour(page, url, { fps, speed, start, cut, cardLead, endCard, urlText, frame, log }) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#viewer:not([hidden])', { timeout: 120000 });
   await page.waitForFunction(() => document.documentElement.dataset.recordReady === '1', { timeout: 120000 });
@@ -294,22 +320,30 @@ async function filmTour(page, url, { fps, speed, start, endCard, urlText, frame,
   // and wastes the seconds that decide whether anyone keeps watching. Skipping
   // into the approach starts the cut on a structure already worth looking at,
   // with the rest of the push-in still to come.
-  const total = Math.max(1, Math.round(((duration - start) / speed) * fps));
+  const segments = (cut ?? [[start, duration]])
+    .map(([a, b]) => [Math.max(0, a), Math.min(duration, b)])
+    .filter(([a, b]) => b > a);
+  const counts = segments.map(([a, b]) => Math.max(1, Math.round(((b - a) / speed) * fps)));
+  const total = counts.reduce((sum, n) => sum + n, 0);
   // The card rides the closing pull-back, which is the only shot with no
   // caption of its own to collide with.
-  const cardIn = total - Math.round(4.2 * fps);
-  log(`  tour: ${total} frames (${((duration - start) / speed).toFixed(1)}s at ${speed}x)`);
+  const cardIn = total - Math.round(cardLead * fps);
+  log(`  tour: ${total} frames (${(total / fps).toFixed(1)}s at ${speed}x, ${segments.length} segment${segments.length > 1 ? 's' : ''})`);
 
-  for (let i = 0; i < total; i += 1) {
-    const t = start + (i / fps) * speed;
-    await page.evaluate((time) => window.__reposense.seek(time), t);
-    if (endCard) {
-      const p = Math.min(1, Math.max(0, (i - cardIn) / (0.9 * fps)));
-      await page.evaluate((o) => {
-        document.getElementById('rs-endcard').style.opacity = String(o);
-      }, easeOut(p));
+  let i = 0;
+  for (const [index, [from]] of segments.entries()) {
+    for (let k = 0; k < counts[index]; k += 1) {
+      const t = from + (k / fps) * speed;
+      await page.evaluate((time) => window.__reposense.seek(time), t);
+      if (endCard) {
+        const p = Math.min(1, Math.max(0, (i - cardIn) / (0.9 * fps)));
+        await page.evaluate((o) => {
+          document.getElementById('rs-endcard').style.opacity = String(o);
+        }, easeOut(p));
+      }
+      await frame();
+      i += 1;
     }
-    await frame();
   }
   return total;
 }
@@ -373,12 +407,20 @@ async function main() {
 
     log(`Filming ${opts.width}x${opts.height} from a ${opts.cssWidth}x${cssHeight} phone…`);
     if (opts.intro) {
-      await filmIntro(page, `http://127.0.0.1:${port}/`, { repo: repoText, fps: opts.fps, frame, log });
+      await filmIntro(page, `http://127.0.0.1:${port}/`, {
+        repo: repoText,
+        fps: opts.fps,
+        seconds: opts.introSeconds,
+        frame,
+        log,
+      });
     }
     await filmTour(page, `http://127.0.0.1:${port}/?record=1#/local`, {
       fps: opts.fps,
       speed: opts.speed,
       start: opts.start,
+      cut: opts.cut,
+      cardLead: opts.cardLead,
       endCard: opts.endCard,
       urlText,
       frame,

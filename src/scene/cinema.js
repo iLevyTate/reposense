@@ -111,15 +111,19 @@ export { SHOTS };
  * The window of the tour, as fractions, over which the chronology scrub
  * sweeps from the first commit to today. Derived from the shot list, so
  * adding or resizing shots cannot silently detach the sweep from the shot
- * it belongs to. The sweep starts partway into the shot, once the cut has
- * settled, and runs a little past its end so "today" lands on the outgoing
- * transition rather than a hard stop.
+ * it belongs to. The sweep waits a beat for the cut to settle, then runs the
+ * rest of the shot and lands on today as the camera leaves.
+ *
+ * The window has to fit inside the shot. A span longer than the shot leaves
+ * the playhead stopped partway when the camera cuts away, and a scrubber
+ * abandoned mid-track reads as a stall rather than as a sweep still going
+ * somewhere the viewer can no longer see.
  */
 export const CHRONO_SWEEP = (() => {
   let acc = 0;
   for (const s of SHOTS) {
     if (s.mode === 'chronology') {
-      return { start: (acc + s.duration * 0.4) / TOUR_DURATION, span: (s.duration * 1.22) / TOUR_DURATION };
+      return { start: (acc + s.duration * 0.18) / TOUR_DURATION, span: (s.duration * 0.82) / TOUR_DURATION };
     }
     acc += s.duration;
   }
