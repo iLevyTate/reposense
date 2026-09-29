@@ -81,9 +81,8 @@ code, kbd, .mono { font-family: var(--mono); }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } }
 
 .brand-mark {
-  display: block; width: 98px; height: 80px; margin: 0 auto 16px;
-  /* The core's bloom, as the 3D view would draw it. */
-  filter: drop-shadow(0 0 16px rgba(102, 224, 255, 0.28));
+  /* The file pads itself for its own bloom, hence the tight bottom margin. */
+  display: block; width: 118px; height: 104px; margin: 0 auto 6px;
 }
 
 .launch h1 {

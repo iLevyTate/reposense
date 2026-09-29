@@ -1,68 +1,153 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="RepoSense">
   <title>RepoSense</title>
   <!--
-    RepoSense: a glowing core in its pool, one terrace spiralling outward
-    around it, and towers standing along the terrace. Mostly warm, with one
-    pink tower, because colour is language. Painted far to near.
+    RepoSense: a lit core in its pool, one terrace spiralling out of the pool,
+    towers standing along the terrace. The brightest tower changed most
+    recently. Painted far to near.
   -->
   <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1630"/><stop offset="1" stop-color="#04060d"/></linearGradient>
-    <radialGradient id="haze" cx=".5" cy=".6" r=".62"><stop offset="0" stop-color="#25508f" stop-opacity=".5"/><stop offset="1" stop-color="#25508f" stop-opacity="0"/></radialGradient>
-    <linearGradient id="face-warm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#f3d98e"/></linearGradient>
-    <linearGradient id="side-warm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2c577"/><stop offset="1" stop-color="#7a6630"/></linearGradient>
-    <linearGradient id="face-pink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3f8"/><stop offset="1" stop-color="#ff8fc0"/></linearGradient>
-    <linearGradient id="side-pink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8739f"/><stop offset="1" stop-color="#6e2346"/></linearGradient>
-    <radialGradient id="glow"><stop offset="0" stop-color="#66e0ff" stop-opacity=".6"/><stop offset="1" stop-color="#66e0ff" stop-opacity="0"/></radialGradient>
-    <radialGradient id="orb" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="#c9f6ff"/><stop offset="1" stop-color="#66e0ff"/></radialGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c1326"/><stop offset="1" stop-color="#04060d"/></linearGradient>
+    <radialGradient id="spill" cx="29" cy="35.16" r="34" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#23467f" stop-opacity=".62"/><stop offset=".55" stop-color="#1a2f5c" stop-opacity=".22"/><stop offset="1" stop-color="#1a2f5c" stop-opacity="0"/></radialGradient>
+    <radialGradient id="vignette" cx=".5" cy=".5" r=".72"><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".35" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#fff" stop-opacity=".02"/></linearGradient>
+    <clipPath id="clip"><rect width="64" height="64" rx="14"/></clipPath>
+    <linearGradient id="deck" x1="0" y1="25.5" x2="0" y2="51.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6f6c7c"/><stop offset=".55" stop-color="#3d4460"/><stop offset="1" stop-color="#171c2c"/></linearGradient>
+    <linearGradient id="wall" x1="0" y1="27.5" x2="0" y2="53.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#141827"/><stop offset="1" stop-color="#0a0d17"/></linearGradient>
+    <linearGradient id="rim" x1="14" y1="0" x2="56" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#66e0ff"/><stop offset=".5" stop-color="#8f6bff"/><stop offset="1" stop-color="#ff5fa8"/></linearGradient>
+    <radialGradient id="fade" cx="20.35" cy="43.55" r="6" gradientUnits="userSpaceOnUse"><stop offset=".1" stop-color="#000"/><stop offset="1" stop-color="#fff"/></radialGradient>
+    <mask id="tail" maskUnits="userSpaceOnUse" x="-8" y="-8" width="80" height="80"><rect x="-8" y="-8" width="80" height="80" fill="url(#fade)"/></mask>
+    <linearGradient id="face-warm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6de"/><stop offset=".6" stop-color="#f4d58a"/><stop offset="1" stop-color="#c79b45"/></linearGradient>
+    <linearGradient id="side-warm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9a257"/><stop offset="1" stop-color="#5c4318"/></linearGradient>
+    <linearGradient id="face-hot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".6" stop-color="#fff0c4"/><stop offset="1" stop-color="#eac06a"/></linearGradient>
+    <linearGradient id="side-hot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6c47a"/><stop offset="1" stop-color="#735524"/></linearGradient>
+    <radialGradient id="pool" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="#9af0ff" stop-opacity=".55"/><stop offset=".55" stop-color="#2f86c2" stop-opacity=".38"/><stop offset="1" stop-color="#0b1f3d" stop-opacity=".7"/></radialGradient>
+    <radialGradient id="orb" cx=".38" cy=".32" r=".78"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#dcfaff"/><stop offset=".75" stop-color="#6fdcff"/><stop offset="1" stop-color="#2aa0d8"/></radialGradient>
+    <filter id="soft" x="-20" y="-20" width="104" height="104" filterUnits="userSpaceOnUse"><feGaussianBlur stdDeviation=".7"/></filter>
+    <filter id="bloom" x="-20" y="-20" width="104" height="104" filterUnits="userSpaceOnUse"><feGaussianBlur stdDeviation="2.4"/></filter>
   </defs>
-  <rect width="64" height="64" rx="14" fill="url(#tile)"/>
-  <rect width="64" height="64" rx="14" fill="url(#haze)"/>
-  <rect x=".5" y=".5" width="63" height="63" rx="13.5" fill="none" stroke="#8cbeff" stroke-opacity=".2"/>
-  <!-- back half of the terrace and the pool rim -->
-  <g fill="none" stroke-linecap="round">
-    <path d="M11.78 40C11.51 38.46 12.14 36.85 13.65 35.39C15.16 33.94 17.56 32.64 20.58 31.69C23.59 30.75 27.22 30.16 31 30.04C34.78 29.91 38.7 30.25 42.24 31.05C45.77 31.84 48.9 33.09 51.17 34.64C53.44 36.2 54.83 38.06 55.1 40" stroke="#8f6bff" stroke-width="4.4"/>
-    <path d="M20 40A11 5.06 0 0 1 42 40" stroke="#66e0ff" stroke-width="3.4"/>
+  <rect width="64" height="64" rx="14" fill="url(#ground)"/>
+  <g clip-path="url(#clip)">
+  <rect width="64" height="64" fill="url(#spill)"/>
+  <g fill="none" stroke="#8fb8ff" stroke-opacity=".07" stroke-width=".3">
+  <ellipse cx="29" cy="39.64" rx="34" ry="17"/>
+  <ellipse cx="29" cy="39.64" rx="42" ry="21"/>
+  <ellipse cx="29" cy="39.64" rx="51" ry="25.5"/>
   </g>
-  <!-- towers behind the core -->
-  <g>
-    <path d="M30.6 30.89L30.6 18.89L32.9 17.86L37.5 17.86L37.5 29.86L35.2 30.89Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
-    <path d="M30.6 30.89L30.6 18.89L35.2 18.89L35.2 30.89Z" fill="url(#face-warm)"/>
-    <path d="M35.2 30.89L35.2 18.89L37.5 17.86L37.5 29.86Z" fill="url(#side-warm)"/>
-    <path d="M30.6 18.89L32.9 17.86L37.5 17.86L35.2 18.89Z" fill="#fffaf0"/>
-    <path d="M18.28 32.57L18.28 18.57L20.58 17.54L25.18 17.54L25.18 31.54L22.88 32.57Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
-    <path d="M18.28 32.57L18.28 18.57L22.88 18.57L22.88 32.57Z" fill="url(#face-pink)"/>
-    <path d="M22.88 32.57L22.88 18.57L25.18 17.54L25.18 31.54Z" fill="url(#side-pink)"/>
-    <path d="M18.28 18.57L20.58 17.54L25.18 17.54L22.88 18.57Z" fill="#fff3f8"/>
-    <path d="M43.32 32.86L43.32 13.86L45.62 12.83L50.22 12.83L50.22 31.83L47.92 32.86Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
-    <path d="M43.32 32.86L43.32 13.86L47.92 13.86L47.92 32.86Z" fill="url(#face-warm)"/>
-    <path d="M47.92 32.86L47.92 13.86L50.22 12.83L50.22 31.83Z" fill="url(#side-warm)"/>
-    <path d="M43.32 13.86L45.62 12.83L50.22 12.83L47.92 13.86Z" fill="#fffaf0"/>
-    <path d="M10.67 37.01L10.67 27.01L12.97 25.98L17.57 25.98L17.57 35.98L15.27 37.01Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
-    <path d="M10.67 37.01L10.67 27.01L15.27 27.01L15.27 37.01Z" fill="url(#face-warm)"/>
-    <path d="M15.27 37.01L15.27 27.01L17.57 25.98L17.57 35.98Z" fill="url(#side-warm)"/>
-    <path d="M10.67 27.01L12.97 25.98L17.57 25.98L15.27 27.01Z" fill="#fffaf0"/>
-    <path d="M51.59 38.06L51.59 23.06L53.89 22.02L58.49 22.02L58.49 37.02L56.19 38.06Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
-    <path d="M51.59 38.06L51.59 23.06L56.19 23.06L56.19 38.06Z" fill="url(#face-warm)"/>
-    <path d="M56.19 38.06L56.19 23.06L58.49 22.02L58.49 37.02Z" fill="url(#side-warm)"/>
-    <path d="M51.59 23.06L53.89 22.02L58.49 22.02L56.19 23.06Z" fill="#fffaf0"/>
+  <g fill="#dbe8ff">
+  <circle cx="9" cy="11" r="0.35" fill-opacity="0.5"/>
+  <circle cx="17" cy="6.5" r="0.25" fill-opacity="0.35"/>
+  <circle cx="46" cy="7" r="0.3" fill-opacity="0.45"/>
+  <circle cx="56.5" cy="14" r="0.25" fill-opacity="0.3"/>
+  <circle cx="6.5" cy="27" r="0.25" fill-opacity="0.3"/>
+  <circle cx="58" cy="33" r="0.3" fill-opacity="0.35"/>
+  <circle cx="38.5" cy="5" r="0.22" fill-opacity="0.3"/>
+  <circle cx="12" cy="52" r="0.22" fill-opacity="0.25"/>
   </g>
-  <!-- pool, glow, core -->
-  <g>
-    <ellipse cx="31" cy="40" rx="11" ry="5.06" fill="#66e0ff" fill-opacity=".16"/>
-    <ellipse cx="31" cy="38.04" rx="15.68" ry="11.76" fill="url(#glow)"/>
-    <circle cx="31" cy="38.04" r="5.6" fill="url(#orb)"/>
   </g>
-  <!-- front half of the pool rim and the terrace -->
-  <g fill="none" stroke-linecap="round">
-    <path d="M42 40A11 5.06 0 0 1 20 40" stroke="#66e0ff" stroke-width="3.4"/>
-    <path d="M18.27 45.85C16.46 45.15 14.93 44.28 13.81 43.28C12.69 42.28 11.98 41.16 11.78 40" stroke="#8f6bff" stroke-width="4.4"/>
-    <path d="M55.1 40C55.31 41.51 54.85 43.05 53.71 44.51C52.58 45.96 50.77 47.33 48.41 48.49C46.05 49.65 43.14 50.59 39.89 51.24" stroke="#8f6bff" stroke-width="4.4"/>
+  <g transform="translate(-4.6 -4.6) scale(1.12)">
+    <!-- back of the terrace -->
+    <g fill="none" mask="url(#tail)">
+    <path d="M16.82 39.5C16.56 38.73 16.57 37.92 16.88 37.11C17.18 36.3 17.79 35.5 18.7 34.76C19.6 34.02 20.79 33.34 22.23 32.77C23.66 32.2 25.34 31.75 27.16 31.46C28.99 31.16 30.97 31.03 32.97 31.07C34.98 31.11 37.02 31.34 38.96 31.74C40.89 32.15 42.72 32.74 44.33 33.49C45.93 34.24 47.29 35.15 48.31 36.17C49.34 37.19 50.01 38.32 50.28 39.5L50.28 41.57C50.01 40.34 49.34 39.17 48.31 38.1C47.29 37.04 45.93 36.08 44.33 35.29C42.72 34.5 40.89 33.86 38.96 33.41C37.02 32.96 34.98 32.69 32.97 32.6C30.97 32.51 28.99 32.61 27.16 32.86C25.34 33.11 23.66 33.51 22.23 34.04C20.79 34.56 19.6 35.19 18.7 35.89C17.79 36.59 17.18 37.35 16.88 38.11C16.57 38.88 16.56 39.64 16.82 40.37Z" fill="url(#wall)"/>
+    <path d="M14.01 39.5C13.61 38.57 13.54 37.57 13.85 36.56C14.16 35.55 14.85 34.54 15.92 33.59C16.99 32.64 18.44 31.76 20.21 31.02C21.98 30.28 24.08 29.68 26.39 29.27C28.7 28.86 31.23 28.65 33.82 28.68C36.4 28.71 39.05 28.97 41.59 29.47C44.12 29.97 46.54 30.71 48.67 31.67C50.79 32.63 52.63 33.8 54.02 35.13C55.41 36.46 56.36 37.94 56.76 39.5L50.28 39.5C50.01 38.32 49.34 37.19 48.31 36.17C47.29 35.15 45.93 34.24 44.33 33.49C42.72 32.74 40.89 32.15 38.96 31.74C37.02 31.34 34.98 31.11 32.97 31.07C30.97 31.03 28.99 31.16 27.16 31.46C25.34 31.75 23.66 32.2 22.23 32.77C20.79 33.34 19.6 34.02 18.7 34.76C17.79 35.5 17.18 36.3 16.88 37.11C16.57 37.92 16.56 38.73 16.82 39.5Z" fill="url(#deck)"/>
+    <path d="M16.82 39.5C16.56 38.73 16.57 37.92 16.88 37.11C17.18 36.3 17.79 35.5 18.7 34.76C19.6 34.02 20.79 33.34 22.23 32.77C23.66 32.2 25.34 31.75 27.16 31.46C28.99 31.16 30.97 31.03 32.97 31.07C34.98 31.11 37.02 31.34 38.96 31.74C40.89 32.15 42.72 32.74 44.33 33.49C45.93 34.24 47.29 35.15 48.31 36.17C49.34 37.19 50.01 38.32 50.28 39.5" stroke="#dfe8ff" stroke-opacity=".28" stroke-width=".3"/>
+    <path d="M14.01 39.5C13.61 38.57 13.54 37.57 13.85 36.56C14.16 35.55 14.85 34.54 15.92 33.59C16.99 32.64 18.44 31.76 20.21 31.02C21.98 30.28 24.08 29.68 26.39 29.27C28.7 28.86 31.23 28.65 33.82 28.68C36.4 28.71 39.05 28.97 41.59 29.47C44.12 29.97 46.54 30.71 48.67 31.67C50.79 32.63 52.63 33.8 54.02 35.13C55.41 36.46 56.36 37.94 56.76 39.5" stroke="url(#rim)" stroke-width="2.21" stroke-opacity=".55" filter="url(#soft)"/>
+    <path d="M14.01 39.5C13.61 38.57 13.54 37.57 13.85 36.56C14.16 35.55 14.85 34.54 15.92 33.59C16.99 32.64 18.44 31.76 20.21 31.02C21.98 30.28 24.08 29.68 26.39 29.27C28.7 28.86 31.23 28.65 33.82 28.68C36.4 28.71 39.05 28.97 41.59 29.47C44.12 29.97 46.54 30.71 48.67 31.67C50.79 32.63 52.63 33.8 54.02 35.13C55.41 36.46 56.36 37.94 56.76 39.5" stroke="url(#rim)" stroke-width="0.85"/>
+    </g>
+    <!-- bloom off the towers -->
+    <g fill="#ffcf70" opacity="0.5" filter="url(#bloom)">
+    <path d="M35.04 30.47L35.04 15.29L40.17 15.29L40.17 30.47Z" fill="#fff0c4"/>
+    <path d="M21.66 31.36L21.66 20.81L26.79 20.81L26.79 31.36Z"/>
+    <path d="M44.28 32.93L44.28 20.21L49.54 20.21L49.54 32.93Z"/>
+    <path d="M16.08 33.78L16.08 21.62L21.31 21.62L21.31 33.78Z"/>
+    <path d="M13.09 37.19L13.09 27.55L18.48 27.55L18.48 37.19Z"/>
+    <path d="M49.99 37.28L49.99 26.56L55.44 26.56L55.44 37.28Z"/>
+    <path d="M50.91 43.41L50.91 34.81L56.58 34.81L56.58 43.41Z"/>
+    </g>
+    <!-- towers behind the core -->
+    <g>
+    <ellipse cx="37.61" cy="30.25" rx="3.34" ry="1.13" fill="#000" fill-opacity=".45" filter="url(#soft)"/>
+    <path d="M35.04 30.47L35.04 16.13L38.55 16.13L38.55 30.47Z" fill="url(#face-hot)"/>
+    <path d="M38.55 30.47L38.55 16.13L40.17 15.29L40.17 29.63Z" fill="url(#side-hot)"/>
+    <path d="M35.04 16.13L36.66 15.29L40.17 15.29L38.55 16.13Z" fill="#ffffff"/>
+    <path d="M35.44 17.48H38.15M38.8 17.38L39.97 16.74M35.44 18.88H38.15M38.8 18.78L39.97 18.14M35.44 20.28H38.15M38.8 20.18L39.97 19.54M35.44 21.68H38.15M38.8 21.58L39.97 20.94M35.44 23.08H38.15M38.8 22.98L39.97 22.34M35.44 24.48H38.15M38.8 24.38L39.97 23.74M35.44 25.88H38.15M38.8 25.78L39.97 25.14M35.44 27.28H38.15M38.8 27.18L39.97 26.54M35.44 28.68H38.15M38.8 28.58L39.97 27.94" stroke="#6b4d17" stroke-opacity=".18" stroke-width=".26"/>
+    <path d="M38.55 16.13V30.47" stroke="#fffaf0" stroke-opacity=".55" stroke-width=".22"/>
+    </g>
+    <g>
+    <ellipse cx="24.23" cy="31.14" rx="3.34" ry="1.12" fill="#000" fill-opacity=".45" filter="url(#soft)"/>
+    <path d="M21.66 31.36L21.66 21.65L25.18 21.65L25.18 31.36Z" fill="url(#face-warm)"/>
+    <path d="M25.18 31.36L25.18 21.65L26.79 20.81L26.79 30.52Z" fill="url(#side-warm)"/>
+    <path d="M21.66 21.65L23.28 20.81L26.79 20.81L25.18 21.65Z" fill="#fff9ea"/>
+    <path d="M22.06 23H24.78M25.43 22.9L26.59 22.26M22.06 24.4H24.78M25.43 24.3L26.59 23.66M22.06 25.8H24.78M25.43 25.7L26.59 25.06M22.06 27.2H24.78M25.43 27.1L26.59 26.46M22.06 28.6H24.78M25.43 28.5L26.59 27.86M22.06 30H24.78M25.43 29.9L26.59 29.26" stroke="#6b4d17" stroke-opacity=".26" stroke-width=".26"/>
+    <path d="M25.18 21.65V31.36" stroke="#fffaf0" stroke-opacity=".55" stroke-width=".22"/>
+    </g>
+    <g>
+    <ellipse cx="46.91" cy="32.7" rx="3.42" ry="1.15" fill="#000" fill-opacity=".45" filter="url(#soft)"/>
+    <path d="M44.28 32.93L44.28 21.07L47.88 21.07L47.88 32.93Z" fill="url(#face-warm)"/>
+    <path d="M47.88 32.93L47.88 21.07L49.54 20.21L49.54 32.07Z" fill="url(#side-warm)"/>
+    <path d="M44.28 21.07L45.94 20.21L49.54 20.21L47.88 21.07Z" fill="#fff9ea"/>
+    <path d="M44.68 22.42H47.48M48.13 22.32L49.34 21.66M44.68 23.82H47.48M48.13 23.72L49.34 23.06M44.68 25.22H47.48M48.13 25.12L49.34 24.46M44.68 26.62H47.48M48.13 26.52L49.34 25.86M44.68 28.02H47.48M48.13 27.92L49.34 27.26M44.68 29.42H47.48M48.13 29.32L49.34 28.66M44.68 30.82H47.48M48.13 30.72L49.34 30.06M44.68 32.22H47.48M48.13 32.12L49.34 31.46" stroke="#6b4d17" stroke-opacity=".26" stroke-width=".26"/>
+    <path d="M47.88 21.07V32.93" stroke="#fffaf0" stroke-opacity=".55" stroke-width=".22"/>
+    </g>
+    <g>
+    <ellipse cx="18.69" cy="33.55" rx="3.4" ry="1.15" fill="#000" fill-opacity=".45" filter="url(#soft)"/>
+    <path d="M16.08 33.78L16.08 22.47L19.66 22.47L19.66 33.78Z" fill="url(#face-warm)"/>
+    <path d="M19.66 33.78L19.66 22.47L21.31 21.62L21.31 32.93Z" fill="url(#side-warm)"/>
+    <path d="M16.08 22.47L17.73 21.62L21.31 21.62L19.66 22.47Z" fill="#fff9ea"/>
+    <path d="M16.48 23.82H19.26M19.91 23.72L21.11 23.07M16.48 25.22H19.26M19.91 25.12L21.11 24.47M16.48 26.62H19.26M19.91 26.52L21.11 25.87M16.48 28.02H19.26M19.91 27.92L21.11 27.27M16.48 29.42H19.26M19.91 29.32L21.11 28.67M16.48 30.82H19.26M19.91 30.72L21.11 30.07M16.48 32.22H19.26M19.91 32.12L21.11 31.47" stroke="#6b4d17" stroke-opacity=".26" stroke-width=".26"/>
+    <path d="M19.66 22.47V33.78" stroke="#fffaf0" stroke-opacity=".55" stroke-width=".22"/>
+    </g>
+    <g>
+    <ellipse cx="15.79" cy="36.94" rx="3.51" ry="1.18" fill="#000" fill-opacity=".45" filter="url(#soft)"/>
+    <path d="M13.09 37.19L13.09 28.43L16.78 28.43L16.78 37.19Z" fill="url(#face-warm)"/>
+    <path d="M16.78 37.19L16.78 28.43L18.48 27.55L18.48 36.3Z" fill="url(#side-warm)"/>
+    <path d="M13.09 28.43L14.79 27.55L18.48 27.55L16.78 28.43Z" fill="#fff9ea"/>
+    <path d="M13.49 29.78H16.38M17.03 29.68L18.28 29M13.49 31.18H16.38M17.03 31.08L18.28 30.4M13.49 32.58H16.38M17.03 32.48L18.28 31.8M13.49 33.98H16.38M17.03 33.88L18.28 33.2M13.49 35.38H16.38M17.03 35.28L18.28 34.6" stroke="#6b4d17" stroke-opacity=".26" stroke-width=".26"/>
+    <path d="M16.78 28.43V37.19" stroke="#fffaf0" stroke-opacity=".55" stroke-width=".22"/>
+    </g>
+    <g>
+    <ellipse cx="52.72" cy="37.03" rx="3.55" ry="1.19" fill="#000" fill-opacity=".45" filter="url(#soft)"/>
+    <path d="M49.99 37.28L49.99 27.46L53.72 27.46L53.72 37.28Z" fill="url(#face-warm)"/>
+    <path d="M53.72 37.28L53.72 27.46L55.44 26.56L55.44 36.38Z" fill="url(#side-warm)"/>
+    <path d="M49.99 27.46L51.71 26.56L55.44 26.56L53.72 27.46Z" fill="#fff9ea"/>
+    <path d="M50.39 28.81H53.32M53.97 28.71L55.24 28.01M50.39 30.21H53.32M53.97 30.11L55.24 29.41M50.39 31.61H53.32M53.97 31.51L55.24 30.81M50.39 33.01H53.32M53.97 32.91L55.24 32.21M50.39 34.41H53.32M53.97 34.31L55.24 33.61M50.39 35.81H53.32M53.97 35.71L55.24 35.01" stroke="#6b4d17" stroke-opacity=".26" stroke-width=".26"/>
+    <path d="M53.72 27.46V37.28" stroke="#fffaf0" stroke-opacity=".55" stroke-width=".22"/>
+    </g>
+    <!-- pool -->
+    <ellipse cx="30" cy="39.5" rx="10.2" ry="5.1" fill="url(#pool)"/>
+    <g fill="none" stroke="#a8f0ff" stroke-opacity=".16" stroke-width=".26">
+    <ellipse cx="30" cy="39.5" rx="6.32" ry="3.16"/>
+    <ellipse cx="30" cy="39.5" rx="8.47" ry="4.23"/>
+    </g>
+    <ellipse cx="30" cy="39.5" rx="10.2" ry="5.1" fill="none" stroke="#66e0ff" stroke-width="2.6" stroke-opacity=".5" filter="url(#soft)"/>
+    <ellipse cx="30" cy="39.5" rx="10.2" ry="5.1" fill="none" stroke="#7fe8ff" stroke-width="1"/>
+    <!-- core -->
+    <ellipse cx="30" cy="40" rx="5.38" ry="1.46" fill="#bff4ff" fill-opacity=".55" filter="url(#soft)"/>
+    <circle cx="30" cy="37.8" r="9.03" fill="#66e0ff" fill-opacity=".5" filter="url(#bloom)"/>
+    <circle cx="30" cy="37.8" r="4.3" fill="url(#orb)"/>
+    <ellipse cx="28.54" cy="36.08" rx="1.46" ry="0.86" fill="#fff" fill-opacity=".9" transform="rotate(-32 28.54 36.08)"/>
+    <!-- front of the terrace -->
+    <g fill="none" mask="url(#tail)">
+    <path d="M19.58 43.87C18.26 43.39 17.06 42.77 16.1 42.03C15.13 41.29 14.41 40.43 14.01 39.5L14.01 40.37C14.41 41.25 15.13 42.07 16.1 42.76C17.06 43.46 18.26 44.04 19.58 44.47Z" fill="url(#wall)"/>
+    <path d="M19.58 43.87C18.26 43.39 17.06 42.77 16.1 42.03C15.13 41.29 14.41 40.43 14.01 39.5L16.82 39.5C17.09 40.27 17.62 40.99 18.36 41.62C19.1 42.25 20.04 42.8 21.11 43.23Z" fill="url(#deck)"/>
+    <path d="M21.11 43.23C20.04 42.8 19.1 42.25 18.36 41.62C17.62 40.99 17.09 40.27 16.82 39.5" stroke="#dfe8ff" stroke-opacity=".28" stroke-width=".3"/>
+    <path d="M19.58 43.87C18.26 43.39 17.06 42.77 16.1 42.03C15.13 41.29 14.41 40.43 14.01 39.5" stroke="url(#rim)" stroke-width="2.21" stroke-opacity=".55" filter="url(#soft)"/>
+    <path d="M19.58 43.87C18.26 43.39 17.06 42.77 16.1 42.03C15.13 41.29 14.41 40.43 14.01 39.5" stroke="url(#rim)" stroke-width="0.85"/>
+    <path d="M56.76 39.5C57.09 40.8 57.04 42.14 56.59 43.48C56.14 44.82 55.28 46.14 54.02 47.4C52.77 48.66 51.12 49.84 49.12 50.89L49.12 53.29C51.12 52.2 52.77 50.98 54.02 49.69C55.28 48.4 56.14 47.03 56.59 45.66C57.04 44.28 57.09 42.9 56.76 41.57Z" fill="url(#wall)"/>
+    <path d="M56.76 39.5C57.09 40.8 57.04 42.14 56.59 43.48C56.14 44.82 55.28 46.14 54.02 47.4C52.77 48.66 51.12 49.84 49.12 50.89L44.3 48.02C45.81 47.24 47.07 46.37 48.04 45.43C49.01 44.5 49.68 43.51 50.06 42.5C50.43 41.5 50.5 40.48 50.28 39.5Z" fill="url(#deck)"/>
+    <path d="M50.28 39.5C50.5 40.48 50.43 41.5 50.06 42.5C49.68 43.51 49.01 44.5 48.04 45.43C47.07 46.37 45.81 47.24 44.3 48.02" stroke="#dfe8ff" stroke-opacity=".28" stroke-width=".3"/>
+    <path d="M56.76 39.5C57.09 40.8 57.04 42.14 56.59 43.48C56.14 44.82 55.28 46.14 54.02 47.4C52.77 48.66 51.12 49.84 49.12 50.89" stroke="url(#rim)" stroke-width="2.21" stroke-opacity=".55" filter="url(#soft)"/>
+    <path d="M56.76 39.5C57.09 40.8 57.04 42.14 56.59 43.48C56.14 44.82 55.28 46.14 54.02 47.4C52.77 48.66 51.12 49.84 49.12 50.89" stroke="url(#rim)" stroke-width="0.85"/>
+    </g>
+    <!-- towers in front of the core -->
+    <g>
+    <ellipse cx="53.74" cy="43.15" rx="3.69" ry="1.24" fill="#000" fill-opacity=".45" filter="url(#soft)"/>
+    <path d="M50.91 43.41L50.91 35.74L54.79 35.74L54.79 43.41Z" fill="url(#face-warm)"/>
+    <path d="M54.79 43.41L54.79 35.74L56.58 34.81L56.58 42.48Z" fill="url(#side-warm)"/>
+    <path d="M50.91 35.74L52.69 34.81L56.58 34.81L54.79 35.74Z" fill="#fff9ea"/>
+    <path d="M51.31 37.09H54.39M55.04 36.99L56.38 36.26M51.31 38.49H54.39M55.04 38.39L56.38 37.66M51.31 39.89H54.39M55.04 39.79L56.38 39.06M51.31 41.29H54.39M55.04 41.19L56.38 40.46M51.31 42.69H54.39M55.04 42.59L56.38 41.86" stroke="#6b4d17" stroke-opacity=".26" stroke-width=".26"/>
+    <path d="M54.79 35.74V43.41" stroke="#fffaf0" stroke-opacity=".55" stroke-width=".22"/>
+    </g>
   </g>
-  <!-- towers in front of the core -->
-  <g>
-    <path d="M51.86 44.76L51.86 35.76L54.16 34.72L58.76 34.72L58.76 43.72L56.46 44.76Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
-    <path d="M51.86 44.76L51.86 35.76L56.46 35.76L56.46 44.76Z" fill="url(#face-warm)"/>
-    <path d="M56.46 44.76L56.46 35.76L58.76 34.72L58.76 43.72Z" fill="url(#side-warm)"/>
-    <path d="M51.86 35.76L54.16 34.72L58.76 34.72L56.46 35.76Z" fill="#fffaf0"/>
-  </g>
+  <rect width="64" height="64" rx="14" fill="url(#vignette)"/>
+  <rect x=".3" y=".3" width="63.4" height="63.4" rx="13.7" fill="none" stroke="url(#sheen)" stroke-width=".6"/>
 </svg>
