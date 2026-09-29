@@ -81,18 +81,9 @@ code, kbd, .mono { font-family: var(--mono); }
 @keyframes rise { from { opacity: 0; transform: translateY(18px); } }
 
 .brand-mark {
-  position: relative; width: 72px; height: 72px; margin: 0 auto 18px;
+  /* The file pads itself for its own bloom, hence the tight bottom margin. */
+  display: block; width: 118px; height: 104px; margin: 0 auto 6px;
 }
-.brand-mark .ring, .brand-mark .core {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  border-radius: 50%;
-}
-.brand-mark .core { width: 13px; height: 13px; background: var(--accent); box-shadow: 0 0 22px 6px rgba(102, 224, 255, 0.75); }
-.brand-mark .ring { border: 1.5px solid; }
-.brand-mark .r1 { width: 32px; height: 32px; border-color: rgba(102, 224, 255, 0.85); animation: spin 7s linear infinite; }
-.brand-mark .r2 { width: 52px; height: 52px; border-color: rgba(143, 107, 255, 0.7); animation: spin 12s linear infinite reverse; }
-.brand-mark .r3 { width: 72px; height: 72px; border-color: rgba(255, 95, 168, 0.4); animation: spin 20s linear infinite; }
-@keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 
 .launch h1 {
   margin: 0; font-size: clamp(38px, 7vw, 60px); font-weight: 700; letter-spacing: -0.035em;
@@ -627,7 +618,6 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand-mark .ring { animation: none; }
   .launch-inner, .caption, .toast { animation: none; }
   .panel, .dock, .help[open] { animation: none; }
   .loading-orb span { animation-duration: 4s; }

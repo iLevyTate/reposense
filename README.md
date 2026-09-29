@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="public/icon.svg" width="88" height="88" alt="">
+
 # RepoSense
 
 **Visualize your repo cinematically.**

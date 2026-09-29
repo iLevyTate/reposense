@@ -490,6 +490,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json',
 };
 
 /** Serves the bundled viewer plus the freshly scanned payload at /__data.json. */

@@ -53,3 +53,6 @@ comments, UI copy, commit messages, PR bodies, release notes, and posts.
   it before any push that touches the viewer.
 - `node scripts/reposense.mjs <dir> --json --svg out.svg` renders any local
   repository without the browser.
+- `npm run brand` redraws the logo and every icon in `public/` from
+  `scripts/brand.mjs`. Change the geometry there; hand edits to the SVGs are
+  overwritten on the next run.
