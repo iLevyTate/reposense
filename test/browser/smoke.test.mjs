@@ -79,6 +79,52 @@ test('the launch screen renders', async () => {
   assert.match(await page.title(), /RepoSense/);
 });
 
+test('every icon the page and its manifest name loads at its stated size', async () => {
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  const report = await page.evaluate(async () => {
+    const load = async (url) => {
+      const res = await fetch(url);
+      const img = new Image();
+      img.src = url;
+      try {
+        await img.decode();
+      } catch {
+        /* reported as width 0 */
+      }
+      return { url, status: res.status, type: res.headers.get('content-type'), width: img.naturalWidth };
+    };
+    const links = [...document.querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]')];
+    const manifestLink = document.querySelector('link[rel="manifest"]');
+    const manifestRes = await fetch(manifestLink.href);
+    const manifest = await manifestRes.json();
+    const mark = document.querySelector('.brand-mark');
+    await mark.decode();
+    return {
+      links: await Promise.all(links.map((l) => load(l.href))),
+      manifestType: manifestRes.headers.get('content-type'),
+      icons: await Promise.all(manifest.icons.map(async (i) => ({
+        ...(await load(new URL(i.src, manifestLink.href).href)), sizes: i.sizes, purpose: i.purpose,
+      }))),
+      mark: mark.naturalWidth,
+    };
+  });
+
+  const names = report.links.map((l) => l.url.split('/').pop());
+  for (const want of ['favicon.ico', 'favicon.svg', 'apple-touch-icon.png']) {
+    assert.ok(names.includes(want), `the page links ${want}`);
+  }
+  for (const icon of [...report.links, ...report.icons]) {
+    assert.equal(icon.status, 200, `${icon.url} is served`);
+    assert.ok(icon.width > 0, `${icon.url} decodes as an image`);
+  }
+  for (const icon of report.icons.filter((i) => /^\d+x\d+$/.test(i.sizes))) {
+    assert.equal(`${icon.width}x${icon.width}`, icon.sizes, `${icon.url} is the size the manifest says`);
+  }
+  assert.match(report.manifestType, /manifest\+json/);
+  assert.ok(report.icons.some((i) => i.purpose === 'maskable'), 'Android gets a maskable icon');
+  assert.ok(report.mark > 0, 'the launch screen mark decodes');
+});
+
 test('the demo route builds a structure and draws it', async () => {
   await page.goto(`${BASE}#/demo`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#viewer:not([hidden])', { timeout: 60000 });
