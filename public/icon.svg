@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="RepoSense">
+  <title>RepoSense</title>
+  <!--
+    RepoSense: a glowing core in its pool, one terrace spiralling outward
+    around it, and towers standing along the terrace. Mostly warm, with one
+    pink tower, because colour is language. Painted far to near.
+  -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1630"/><stop offset="1" stop-color="#04060d"/></linearGradient>
+    <radialGradient id="haze" cx=".5" cy=".6" r=".62"><stop offset="0" stop-color="#25508f" stop-opacity=".5"/><stop offset="1" stop-color="#25508f" stop-opacity="0"/></radialGradient>
+    <linearGradient id="face-warm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#f3d98e"/></linearGradient>
+    <linearGradient id="side-warm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2c577"/><stop offset="1" stop-color="#7a6630"/></linearGradient>
+    <linearGradient id="face-pink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3f8"/><stop offset="1" stop-color="#ff8fc0"/></linearGradient>
+    <linearGradient id="side-pink" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8739f"/><stop offset="1" stop-color="#6e2346"/></linearGradient>
+    <radialGradient id="glow"><stop offset="0" stop-color="#66e0ff" stop-opacity=".6"/><stop offset="1" stop-color="#66e0ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="orb" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="#c9f6ff"/><stop offset="1" stop-color="#66e0ff"/></radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#tile)"/>
+  <rect width="64" height="64" rx="14" fill="url(#haze)"/>
+  <rect x=".5" y=".5" width="63" height="63" rx="13.5" fill="none" stroke="#8cbeff" stroke-opacity=".2"/>
+  <!-- back half of the terrace and the pool rim -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M11.78 40C11.51 38.46 12.14 36.85 13.65 35.39C15.16 33.94 17.56 32.64 20.58 31.69C23.59 30.75 27.22 30.16 31 30.04C34.78 29.91 38.7 30.25 42.24 31.05C45.77 31.84 48.9 33.09 51.17 34.64C53.44 36.2 54.83 38.06 55.1 40" stroke="#8f6bff" stroke-width="4.4"/>
+    <path d="M20 40A11 5.06 0 0 1 42 40" stroke="#66e0ff" stroke-width="3.4"/>
+  </g>
+  <!-- towers behind the core -->
+  <g>
+    <path d="M30.6 30.89L30.6 18.89L32.9 17.86L37.5 17.86L37.5 29.86L35.2 30.89Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M30.6 30.89L30.6 18.89L35.2 18.89L35.2 30.89Z" fill="url(#face-warm)"/>
+    <path d="M35.2 30.89L35.2 18.89L37.5 17.86L37.5 29.86Z" fill="url(#side-warm)"/>
+    <path d="M30.6 18.89L32.9 17.86L37.5 17.86L35.2 18.89Z" fill="#fffaf0"/>
+    <path d="M18.28 32.57L18.28 18.57L20.58 17.54L25.18 17.54L25.18 31.54L22.88 32.57Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M18.28 32.57L18.28 18.57L22.88 18.57L22.88 32.57Z" fill="url(#face-pink)"/>
+    <path d="M22.88 32.57L22.88 18.57L25.18 17.54L25.18 31.54Z" fill="url(#side-pink)"/>
+    <path d="M18.28 18.57L20.58 17.54L25.18 17.54L22.88 18.57Z" fill="#fff3f8"/>
+    <path d="M43.32 32.86L43.32 13.86L45.62 12.83L50.22 12.83L50.22 31.83L47.92 32.86Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M43.32 32.86L43.32 13.86L47.92 13.86L47.92 32.86Z" fill="url(#face-warm)"/>
+    <path d="M47.92 32.86L47.92 13.86L50.22 12.83L50.22 31.83Z" fill="url(#side-warm)"/>
+    <path d="M43.32 13.86L45.62 12.83L50.22 12.83L47.92 13.86Z" fill="#fffaf0"/>
+    <path d="M10.67 37.01L10.67 27.01L12.97 25.98L17.57 25.98L17.57 35.98L15.27 37.01Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M10.67 37.01L10.67 27.01L15.27 27.01L15.27 37.01Z" fill="url(#face-warm)"/>
+    <path d="M15.27 37.01L15.27 27.01L17.57 25.98L17.57 35.98Z" fill="url(#side-warm)"/>
+    <path d="M10.67 27.01L12.97 25.98L17.57 25.98L15.27 27.01Z" fill="#fffaf0"/>
+    <path d="M51.59 38.06L51.59 23.06L53.89 22.02L58.49 22.02L58.49 37.02L56.19 38.06Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M51.59 38.06L51.59 23.06L56.19 23.06L56.19 38.06Z" fill="url(#face-warm)"/>
+    <path d="M56.19 38.06L56.19 23.06L58.49 22.02L58.49 37.02Z" fill="url(#side-warm)"/>
+    <path d="M51.59 23.06L53.89 22.02L58.49 22.02L56.19 23.06Z" fill="#fffaf0"/>
+  </g>
+  <!-- pool, glow, core -->
+  <g>
+    <ellipse cx="31" cy="40" rx="11" ry="5.06" fill="#66e0ff" fill-opacity=".16"/>
+    <ellipse cx="31" cy="38.04" rx="15.68" ry="11.76" fill="url(#glow)"/>
+    <circle cx="31" cy="38.04" r="5.6" fill="url(#orb)"/>
+  </g>
+  <!-- front half of the pool rim and the terrace -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M42 40A11 5.06 0 0 1 20 40" stroke="#66e0ff" stroke-width="3.4"/>
+    <path d="M18.27 45.85C16.46 45.15 14.93 44.28 13.81 43.28C12.69 42.28 11.98 41.16 11.78 40" stroke="#8f6bff" stroke-width="4.4"/>
+    <path d="M55.1 40C55.31 41.51 54.85 43.05 53.71 44.51C52.58 45.96 50.77 47.33 48.41 48.49C46.05 49.65 43.14 50.59 39.89 51.24" stroke="#8f6bff" stroke-width="4.4"/>
+  </g>
+  <!-- towers in front of the core -->
+  <g>
+    <path d="M51.86 44.76L51.86 35.76L54.16 34.72L58.76 34.72L58.76 43.72L56.46 44.76Z" fill="#04060d" stroke="#04060d" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M51.86 44.76L51.86 35.76L56.46 35.76L56.46 44.76Z" fill="url(#face-warm)"/>
+    <path d="M56.46 44.76L56.46 35.76L58.76 34.72L58.76 43.72Z" fill="url(#side-warm)"/>
+    <path d="M51.86 35.76L54.16 34.72L58.76 34.72L56.46 35.76Z" fill="#fffaf0"/>
+  </g>
+</svg>
