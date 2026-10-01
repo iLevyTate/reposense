@@ -217,6 +217,28 @@ of the 54 second tour the cut compresses (1.08 lands it at 50 seconds),
 `--css-width` the phone width the site is laid out at, and `--no-intro` or
 `--no-end-card` drop those beats for a clean scene-only version.
 
+### A wide cut
+
+`--layout wide` films the desktop site and the phone at once and sets them
+side by side on 1920x1080: a 1440x900 page in a generic browser window, and a
+393x852 phone in front of the window's right edge. Both are scaled by 0.9, so
+a CSS pixel is the same size on either screen. The desktop HUD stops 18px
+short of the page's edge, and the phone covers part of that empty strip and
+nothing else.
+
+```bash
+node scripts/promo.mjs --data reposense.json --layout wide --out promo-wide.mp4
+```
+
+The two screens run the same beats on the same frames. Each character of the
+repository name lands on both at once, the desktop clicks Visualize with a
+drawn pointer while the phone gets the tap, and every tour frame is the same
+timestamp under both cameras. The address bar switches to the repository's
+route on the click. Instead of the lower third, the wide cut dips to black and
+holds a five second end card, since a card over the closing shot would have
+to straddle two screens. With the default timings it runs 55 seconds, and it
+took 40 minutes to render on a container with no GPU.
+
 ### Put it in your README
 
 The rendered SVG is a few dozen kilobytes and refreshes itself on every push:
@@ -379,7 +401,7 @@ src/
   ui/hud.js           panels, inspector, tooltip, toasts
 scripts/reposense.mjs the local scanner (zero dependencies)
 scripts/record.mjs    offline recorder: tour -> gif / mp4 / webm / webp
-scripts/promo.mjs     9:16 phone cut for social posts
+scripts/promo.mjs     phone (9:16) and desktop-beside-phone (16:9) cuts for social posts
 action.yml            the GitHub Action
 vendor/three/         three.js, vendored so there is no CDN dependency
 ```
