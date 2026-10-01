@@ -236,8 +236,8 @@ drawn pointer while the phone gets the tap, and every tour frame is the same
 timestamp under both cameras. The address bar switches to the repository's
 route on the click. Instead of the lower third, the wide cut dips to black and
 holds a five second end card, since a card over the closing shot would have
-to straddle two screens. With the default timings it runs 55 seconds. Expect
-the render to take about half an hour on a machine without a GPU.
+to straddle two screens. With the default timings it runs 55 seconds, and it
+took 40 minutes to render on a container with no GPU.
 
 ### Put it in your README
 
