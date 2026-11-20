@@ -57,7 +57,7 @@ jobs:
 
   browser:
     name: Browser smoke test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # A wedged browser must not sit on the runner until the six-hour default.
     timeout-minutes: 25
     steps:
