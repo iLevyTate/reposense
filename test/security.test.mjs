@@ -16,7 +16,7 @@ test('UUIDs use secure randomness and retain UUID v4 format', () => {
 
 test('404 project roots require a github.io domain boundary', () => {
   const html = readFileSync(new URL('../404.html', import.meta.url), 'utf8');
-  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const script = html.match(/<script>([\s\S]*?)<\/script>/i)[1];
   for (const [hostname, expected] of [['user.github.io', '/reposense/#/owner/repo'], ['evilgithub.io', '/']]) {
     let target;
     vm.runInNewContext(script, { location: { hostname, pathname: '/reposense/owner/repo', hash: '', replace: (value) => { target = value; } } });
