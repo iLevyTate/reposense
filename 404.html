@@ -23,7 +23,7 @@
   (function () {
     var parts = location.pathname.split('/').filter(Boolean);
     // A github.io project site is served under /<repo>/; a user site is at /.
-    var siteRoot = location.hostname.endsWith('github.io') && parts.length ? '/' + parts[0] + '/' : '/';
+    var siteRoot = location.hostname.endsWith('.github.io') && parts.length ? '/' + parts[0] + '/' : '/';
     var rest = location.pathname.slice(siteRoot.length).replace(/^\/+|\/+$/g, '');
     var hash = /^[\w.-]+\/[\w.-]+$/.test(rest) ? '#/' + rest : '';
     var target = siteRoot + hash;
