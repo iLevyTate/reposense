@@ -21,7 +21,7 @@ async function scan(dir, extra = []) {
 test('--help exits cleanly and documents the flags', async () => {
   const { stdout } = await run(process.execPath, [CLI, '--help']);
   for (const flag of ['--out', '--commits', '--no-history', '--json', '--port']) {
-    assert.match(stdout, new RegExp(flag.replace(/-/g, '\\-')));
+    assert.ok(stdout.includes(flag));
   }
 });
 
