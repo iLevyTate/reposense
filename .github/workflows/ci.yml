@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # The CLI tests replay this repository's own git log.
           fetch-depth: 0
@@ -61,8 +61,7 @@ jobs:
     # A wedged browser must not sit on the runner until the six-hour default.
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@v4
         with:
           node-version: 26
