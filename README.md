@@ -265,10 +265,10 @@ To serve both colour schemes, render twice and let the browser pick:
 </a>
 ```
 
-This repository does exactly that. See
-[`.github/workflows/visualize.yml`](.github/workflows/visualize.yml), which
-renders both variants and commits them. The workflow skips its own bot
-commits, so it settles after one pass instead of looping.
+This repository renders both variants from `main` and publishes them on the
+`reposense-visuals` branch. Use the [dark SVG](https://raw.githubusercontent.com/iLevyTate/reposense/reposense-visuals/public/reposense-dark.svg)
+or [light SVG](https://raw.githubusercontent.com/iLevyTate/reposense/reposense-visuals/public/reposense-light.svg).
+The [Visualize workflow](.github/workflows/visualize.yml) publishes only when the output changes.
 
 #### It moves, without being a GIF
 

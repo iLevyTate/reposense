@@ -14,10 +14,7 @@ concurrency:
 
 jobs:
   render:
-    # The commit this job makes lands on main and re-triggers the workflow. The
-    # second run renders identical files, finds nothing staged, commits nothing
-    # and stops, so this settles rather than looping.
-    if: github.actor != 'github-actions[bot]'
+    if: github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -38,18 +35,30 @@ jobs:
           output: public/reposense-light.svg
           theme: light
 
-      # Committed here rather than by the action, because two files are being
-      # written and the action's own commit step only stages its own output.
-      - name: Commit both variants
+      - name: Publish both variants to the output branch
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          output_ref=refs/heads/reposense-visuals
+          existing=$(git ls-remote --refs origin "$output_ref")
+          parents=()
+          export GIT_INDEX_FILE="$RUNNER_TEMP/reposense-visuals.index"
+          if [[ -n "$existing" ]]; then
+            git fetch --no-tags origin "$output_ref"
+            previous=$(git rev-parse FETCH_HEAD)
+            parents=(-p "$previous")
+            git read-tree "$previous"
+          else
+            git read-tree --empty
+          fi
+
           git add -- public/reposense-dark.svg public/reposense-light.svg
-          if git diff --cached --quiet; then
+          tree=$(git write-tree)
+          if [[ -n "$existing" && "$tree" == "$(git rev-parse "$previous^{tree}")" ]]; then
             echo "Visualization is already current." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          git commit -m "chore: refresh the RepoSense visualization"
-          git push
-          echo "Refreshed from ${{ steps.dark.outputs.files }} files." >> "$GITHUB_STEP_SUMMARY"
+          commit=$(git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit-tree "$tree" "${parents[@]}" -m 'chore: refresh the RepoSense visualization')
+          git push origin "$commit:$output_ref"
+          echo "Published the two variants to reposense-visuals." >> "$GITHUB_STEP_SUMMARY"
