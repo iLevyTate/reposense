@@ -21,7 +21,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # The bundled example is generated from this repo's own git log, so
           # the deploy needs real history, not the default depth-1 clone.
