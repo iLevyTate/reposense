@@ -51,7 +51,7 @@ jobs:
           # pages: write, and the repository is public, so this exposes nothing
           # that was not already public.
           enablement: true
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: .
       - id: deploy
