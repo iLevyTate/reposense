@@ -43,7 +43,7 @@ jobs:
       - name: Refresh the bundled example
         run: node scripts/reposense.mjs . --json --out public/demo.json
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
         with:
           # Turn Pages on if it is not already. Without this the first deploy
           # after a merge fails with "Get Pages site failed", and the fix is a
